@@ -1,0 +1,5 @@
+# Local secrets and generated Python files must not be committed.
+backend/.env
+backend/venv/
+__pycache__/
+*.py[cod]
