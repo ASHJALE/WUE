@@ -25,3 +25,8 @@ body {
   height: 12rem;
   object-fit: cover;
 }
+
+.dashboard-chart {
+  position: relative;
+  min-height: 18rem;
+}
