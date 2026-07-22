@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-QuotationStatus = Literal["draft", "issued", "accepted", "rejected", "expired"]
+QuotationStatus = Literal["draft", "approved", "rejected", "completed"]
 
 
 class QuotationGenerate(BaseModel):
