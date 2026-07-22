@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { FaCouch } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext.jsx'
 
-const links = [
-  ['/', 'Home'],
+const authenticatedLinks = [
   ['/dashboard', 'Dashboard'],
   ['/estimates', 'Estimates'],
   ['/bom', 'BOM'],
@@ -10,6 +10,14 @@ const links = [
 ]
 
 function Navbar() {
+  const { isAuthenticated, user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark" aria-label="Main navigation">
       <div className="container">
@@ -30,7 +38,7 @@ function Navbar() {
         </button>
         <div className="collapse navbar-collapse" id="mainNavbar">
           <ul className="navbar-nav ms-auto align-items-lg-center gap-lg-1">
-            {links.map(([path, label]) => (
+            {(isAuthenticated ? authenticatedLinks : [['/', 'Home']]).map(([path, label]) => (
               <li className="nav-item" key={path}>
                 <NavLink
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
@@ -41,11 +49,21 @@ function Navbar() {
                 </NavLink>
               </li>
             ))}
-            <li className="nav-item ms-lg-2">
-              <NavLink className="btn btn-outline-light btn-sm" to="/login">
-                Login
-              </NavLink>
-            </li>
+            {isAuthenticated ? (
+              <>
+                <li className="nav-item ms-lg-2">
+                  <span className="navbar-text text-light">{user.username}</span>
+                </li>
+                <li className="nav-item ms-lg-2">
+                  <button className="btn btn-outline-light btn-sm" onClick={handleLogout} type="button">Logout</button>
+                </li>
+              </>
+            ) : (
+              <>
+                <li className="nav-item ms-lg-2"><NavLink className="nav-link" to="/login">Login</NavLink></li>
+                <li className="nav-item"><NavLink className="btn btn-outline-light btn-sm" to="/register">Register</NavLink></li>
+              </>
+            )}
           </ul>
         </div>
       </div>
