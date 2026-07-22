@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../services/apiErrors.js'
+import { ErrorAlert } from '../components/AppFeedback.jsx'
 import { generateQuotation } from '../services/quotationService.js'
 
 const initialForm = {
@@ -64,7 +65,7 @@ export default function QuotationCreate() {
     <div className="row justify-content-center"><div className="col-lg-7"><section className="card border-0 shadow-sm"><div className="card-body p-4 p-md-5">
       <div className="d-flex align-items-center justify-content-between gap-3 mb-4"><div><h1 className="h2 mb-1">Create quotation</h1><p className="text-secondary mb-0">Estimate #{estimateId || 'not selected'}</p></div><Link className="btn btn-outline-secondary" to={estimateId ? `/estimates/${estimateId}/bom` : '/estimates'}>Cancel</Link></div>
       {!estimateId && <div className="alert alert-warning">Select an estimate and preview its BOM before creating a quotation.</div>}
-      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      {error && <ErrorAlert message={error} />}
       <form onSubmit={handleSubmit} noValidate>
         <div className="mb-3"><label className="form-label" htmlFor="labor-cost">Labor cost</label><input className="form-control" disabled={submitting || !estimateId} id="labor-cost" min="0" name="labor_cost" onChange={updateField} required step="0.01" type="number" value={form.labor_cost} /></div>
         <div className="mb-3"><label className="form-label" htmlFor="logistics-cost">Logistics cost</label><input className="form-control" disabled={submitting || !estimateId} id="logistics-cost" min="0" name="logistics_cost" onChange={updateField} required step="0.01" type="number" value={form.logistics_cost} /></div>

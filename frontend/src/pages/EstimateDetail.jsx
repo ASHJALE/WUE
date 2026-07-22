@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { getEstimate } from '../services/estimateService.js'
+import { ErrorAlert, LoadingState } from '../components/AppFeedback.jsx'
 
 function display(value) {
   if (value === null || value === undefined || value === '') return 'Not available'
@@ -28,8 +29,8 @@ export default function EstimateDetail() {
 
   useEffect(() => { loadEstimate() }, [loadEstimate])
 
-  if (loading) return <div className="text-center py-5"><div className="spinner-border text-success" role="status" /></div>
-  if (error) return <div className="alert alert-danger"><p>{error}</p><button className="btn btn-outline-danger btn-sm" onClick={loadEstimate} type="button">Retry</button></div>
+  if (loading) return <LoadingState label="Loading estimate details…" />
+  if (error) return <ErrorAlert message={error} onRetry={loadEstimate} />
   if (!estimate) return null
 
   const fields = [

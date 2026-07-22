@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import DashboardCharts from '../components/DashboardCharts.jsx'
+import { EmptyState, ErrorAlert } from '../components/AppFeedback.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { getDashboardSummary } from '../services/dashboardService.js'
@@ -65,11 +66,11 @@ export default function Dashboard() {
         </div>
       </div>
       {loading && <SummarySkeleton />}
-      {!loading && error && <div className="alert alert-danger d-flex align-items-center justify-content-between gap-3" role="alert"><span>{error}</span><button className="btn btn-sm btn-outline-danger" onClick={loadDashboard} type="button">Retry</button></div>}
+      {!loading && error && <ErrorAlert message={error} onRetry={loadDashboard} />}
       {!loading && !error && dashboard && (
         <>
           <div className="row g-3 mb-4">{summaryCards.map(([label, value]) => <div className="col-sm-6 col-xl-2" key={label}><div className="card border-0 shadow-sm h-100"><div className="card-body"><span className="small text-secondary">{label}</span><strong className="display-6 d-block mt-2">{value}</strong></div></div></div>)}</div>
-          {dashboard.estimates.length === 0 && dashboard.quotations.length === 0 && <div className="alert alert-light border text-center">No dashboard activity yet. Create an estimate to begin.</div>}
+          {dashboard.estimates.length === 0 && dashboard.quotations.length === 0 && <EmptyState title="No dashboard activity yet" description="Create an estimate to begin building your WUE overview." action={<Link className="btn btn-success" to="/estimates/new">New Estimate</Link>} />}
           <DashboardCharts quotations={dashboard.quotations} statusCounts={dashboard.quotationStatusCounts} timeline={dashboard.estimateTimeline} />
           <div className="row g-4 mb-4">
             <div className="col-xl-6"><section className="card border-0 shadow-sm h-100"><div className="card-body p-4"><div className="d-flex justify-content-between"><h2 className="h5">Recent Estimates</h2><Link to="/estimates">View all</Link></div><ActivityTable records={dashboard.recentEstimates} type="Estimates" /></div></section></div>

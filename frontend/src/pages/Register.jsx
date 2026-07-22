@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { ErrorAlert } from '../components/AppFeedback.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 
 const initialForm = {
@@ -68,7 +69,7 @@ export default function Register() {
           <div className="card-body p-4 p-md-5">
             <h1 className="h2 mb-1">Create an account</h1>
             <p className="text-secondary mb-4">Register to start using WUE.</p>
-            {error && <div className="alert alert-danger" role="alert">{error}</div>}
+            {error && <ErrorAlert message={error} />}
             <form onSubmit={handleSubmit} noValidate>
               <div className="row g-3">
                 <div className="col-md-6">

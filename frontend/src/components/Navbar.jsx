@@ -23,7 +23,7 @@ function Navbar() {
       <div className="container">
         <NavLink className="navbar-brand d-flex align-items-center gap-2" to="/">
           <FaCouch aria-hidden="true" />
-          WUE
+          <span>WUE</span>
         </NavLink>
         <button
           className="navbar-toggler"
@@ -52,10 +52,10 @@ function Navbar() {
             {isAuthenticated ? (
               <>
                 <li className="nav-item ms-lg-2">
-                  <span className="navbar-text text-light">{user.username}</span>
+                  <span className="navbar-text text-light" aria-label={`Signed in as ${user.username}`}>{user.username}</span>
                 </li>
                 <li className="nav-item ms-lg-2">
-                  <button className="btn btn-outline-light btn-sm" onClick={handleLogout} type="button">Logout</button>
+                  <button className="btn btn-outline-light btn-sm" onClick={handleLogout} title="Sign out of WUE" type="button">Logout</button>
                 </li>
               </>
             ) : (

@@ -2,6 +2,10 @@
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: #f4f7f5;
+  --wue-forest: #173f35;
+  --wue-green: #198754;
+  --wue-mint: #d9eee5;
+  --wue-radius: 0.9rem;
 }
 
 body {
@@ -9,6 +13,17 @@ body {
   min-height: 100vh;
   margin: 0;
   background: #f4f7f5;
+  color: #24332f;
+  line-height: 1.55;
+}
+
+a {
+  text-underline-offset: 0.2em;
+}
+
+:focus-visible {
+  outline: 3px solid rgba(25, 135, 84, 0.35);
+  outline-offset: 3px;
 }
 
 .app-shell {
@@ -21,6 +36,66 @@ body {
   color: #75b798;
 }
 
+.navbar {
+  background-color: var(--wue-forest) !important;
+}
+
+.card {
+  border-radius: var(--wue-radius);
+}
+
+.btn,
+.form-control,
+.form-select,
+.alert {
+  border-radius: 0.65rem;
+}
+
+.form-label,
+dt {
+  font-weight: 600;
+}
+
+.table > :not(caption) > * > * {
+  padding: 0.8rem 0.75rem;
+}
+
+.table thead th {
+  color: #53655f;
+  font-size: 0.78rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 2000;
+  top: 0.5rem;
+  left: 0.5rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--wue-forest);
+  transform: translateY(-150%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.app-empty-state {
+  margin-block: 1rem;
+}
+
+.app-empty-state p {
+  max-width: 36rem;
+}
+
+.app-hero {
+  background: linear-gradient(135deg, #fff 0%, var(--wue-mint) 100%);
+}
+
 .estimate-card-image {
   height: 12rem;
   object-fit: cover;
@@ -29,4 +104,34 @@ body {
 .dashboard-chart {
   position: relative;
   min-height: 18rem;
+}
+
+@media (max-width: 575.98px) {
+  .display-5 {
+    font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  .card-body {
+    padding: 1.15rem;
+  }
+
+  .table-responsive {
+    margin-inline: -0.5rem;
+    padding-inline: 0.5rem;
+  }
+
+  .dashboard-chart {
+    min-height: 15rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

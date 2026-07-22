@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { ErrorAlert } from '../components/AppFeedback.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 
 export default function Login() {
@@ -42,7 +43,7 @@ export default function Login() {
             <h1 className="h2 mb-1">Welcome back</h1>
             <p className="text-secondary mb-4">Sign in to continue to WUE.</p>
             {location.state?.message && <div className="alert alert-success" role="status">{location.state.message}</div>}
-            {error && <div className="alert alert-danger" role="alert">{error}</div>}
+            {error && <ErrorAlert message={error} />}
             <form onSubmit={handleSubmit} noValidate>
               <div className="mb-3">
                 <label className="form-label" htmlFor="login-identifier">Username or email</label>

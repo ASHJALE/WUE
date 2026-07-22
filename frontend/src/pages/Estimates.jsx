@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import EstimateCard from '../components/EstimateCard.jsx'
+import { EmptyState, ErrorAlert, LoadingState } from '../components/AppFeedback.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { getEstimates } from '../services/estimateService.js'
@@ -38,28 +39,12 @@ export default function Estimates() {
         <Link className="btn btn-success" to="/estimates/new">Create estimate</Link>
       </div>
 
-      {loading && (
-        <div className="text-center py-5" role="status">
-          <div className="spinner-border text-success" />
-          <p className="text-secondary mt-3">Loading estimates…</p>
-        </div>
-      )}
+      {loading && <LoadingState cards={3} label="Loading estimates…" />}
 
-      {!loading && error && (
-        <div className="alert alert-danger d-flex align-items-center justify-content-between gap-3" role="alert">
-          <span>{error}</span>
-          <button className="btn btn-sm btn-outline-danger" onClick={loadEstimates} type="button">Retry</button>
-        </div>
-      )}
+      {!loading && error && <ErrorAlert message={error} onRetry={loadEstimates} />}
 
       {!loading && !error && estimates.length === 0 && (
-        <div className="card border-0 shadow-sm text-center py-5">
-          <div className="card-body">
-            <h2 className="h4">No estimates yet</h2>
-            <p className="text-secondary">Create your first furniture estimate to get started.</p>
-            <Link className="btn btn-success" to="/estimates/new">Create estimate</Link>
-          </div>
-        </div>
+        <EmptyState title="No estimates yet" description="Create your first furniture estimate to get started." action={<Link className="btn btn-success" to="/estimates/new">Create estimate</Link>} />
       )}
 
       {!loading && !error && estimates.length > 0 && (

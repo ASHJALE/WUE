@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import BomItemCard from '../components/BomItemCard.jsx'
+import { EmptyState, ErrorAlert, LoadingState } from '../components/AppFeedback.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { getBomPreview } from '../services/bomService.js'
 
@@ -25,35 +26,18 @@ export default function BomPreview() {
   useEffect(() => { loadPreview() }, [loadPreview])
 
   if (loading) {
-    return (
-      <div className="text-center py-5" role="status">
-        <div className="spinner-border text-success" />
-        <p className="text-secondary mt-3">Loading BOM preview…</p>
-      </div>
-    )
+    return <LoadingState cards={2} label="Loading BOM preview…" />
   }
 
   if (error) {
     return (
-      <div className="alert alert-danger" role="alert">
-        <p>{error}</p>
-        <div className="d-flex gap-2">
-          <button className="btn btn-sm btn-outline-danger" onClick={loadPreview} type="button">Retry</button>
-          <Link className="btn btn-sm btn-outline-secondary" to={`/estimates/${id}`}>Back to estimate</Link>
-        </div>
-      </div>
+      <><ErrorAlert message={error} onRetry={loadPreview} /><Link className="btn btn-sm btn-outline-secondary" to={`/estimates/${id}`}>Back to estimate</Link></>
     )
   }
 
   if (!preview || preview.items.length === 0) {
     return (
-      <section className="card border-0 shadow-sm text-center py-5">
-        <div className="card-body">
-          <h1 className="h4">No BOM items available</h1>
-          <p className="text-secondary">This estimate has no material rows to preview.</p>
-          <Link className="btn btn-outline-secondary" to={`/estimates/${id}`}>Back to estimate</Link>
-        </div>
-      </section>
+      <EmptyState title="No BOM items available" description="This estimate has no material rows to preview." action={<Link className="btn btn-outline-secondary" to={`/estimates/${id}`}>Back to estimate</Link>} />
     )
   }
 

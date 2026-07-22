@@ -1,12 +1,14 @@
+import { FaCompass } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
+import { EmptyState } from '../components/AppFeedback.jsx'
 
 export default function NotFound() {
   return (
-    <section className="text-center py-5">
-      <p className="display-1 fw-bold text-success mb-0">404</p>
-      <h1>Page not found</h1>
-      <p className="text-secondary">The page you requested does not exist.</p>
-      <Link className="btn btn-success" to="/">Return home</Link>
-    </section>
+    <EmptyState
+      action={<Link className="btn btn-success" to="/">Return home</Link>}
+      description="The page may have moved, or the address may be incorrect."
+      icon={FaCompass}
+      title="Page not found"
+    />
   )
 }

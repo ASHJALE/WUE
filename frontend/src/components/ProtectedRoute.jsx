@@ -1,17 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { LoadingState } from './AppFeedback.jsx'
 
 function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center py-5" role="status" aria-label="Restoring session">
-        <div className="spinner-border text-success" />
-      </div>
-    )
-  }
+  if (loading) return <LoadingState label="Restoring your session…" />
 
   return isAuthenticated
     ? <Outlet />

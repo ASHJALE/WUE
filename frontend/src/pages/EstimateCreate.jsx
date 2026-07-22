@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { ErrorAlert } from '../components/AppFeedback.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
 
@@ -88,7 +89,7 @@ export default function EstimateCreate() {
               <div><h1 className="h2 mb-1">Create estimate</h1><p className="text-secondary mb-0">Enter the fields supported by the WUE estimate API.</p></div>
               <Link className="btn btn-outline-secondary" to="/estimates">Cancel</Link>
             </div>
-            {error && <div className="alert alert-danger" role="alert">{error}</div>}
+            {error && <ErrorAlert message={error} />}
             <form onSubmit={handleSubmit} noValidate>
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>

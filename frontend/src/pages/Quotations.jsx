@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import QuotationCard from '../components/QuotationCard.jsx'
+import { EmptyState, ErrorAlert, LoadingState } from '../components/AppFeedback.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { getQuotations } from '../services/quotationService.js'
@@ -46,10 +47,10 @@ export default function Quotations() {
         <div><h1 className="h2 mb-1">Quotations</h1><p className="text-secondary mb-0">Review generated WUE quotations.</p></div>
         <Link className="btn btn-success" to="/estimates">Choose an estimate</Link>
       </div>
-      {loading && <div className="text-center py-5" role="status"><div className="spinner-border text-success" /><p className="text-secondary mt-3">Loading quotations…</p></div>}
-      {!loading && error && <div className="alert alert-danger d-flex align-items-center justify-content-between gap-3" role="alert"><span>{error}</span><button className="btn btn-sm btn-outline-danger" onClick={loadQuotations} type="button">Retry</button></div>}
+      {loading && <LoadingState cards={3} label="Loading quotations…" />}
+      {!loading && error && <ErrorAlert message={error} onRetry={loadQuotations} />}
       {!loading && !error && quotations.length === 0 && (
-        <div className="card border-0 shadow-sm text-center py-5"><div className="card-body"><h2 className="h4">No quotations yet</h2><p className="text-secondary">Preview an estimate BOM before generating a quotation.</p><Link className="btn btn-success" to="/estimates">View estimates</Link></div></div>
+        <EmptyState title="No quotations yet" description="Preview an estimate BOM before generating a quotation." action={<Link className="btn btn-success" to="/estimates">View estimates</Link>} />
       )}
       {!loading && !error && quotations.length > 0 && (
         <div className="row g-4">{quotations.map((quotation) => <div className="col-md-6 col-xl-4" key={quotation.id}><QuotationCard quotation={quotation} /></div>)}</div>

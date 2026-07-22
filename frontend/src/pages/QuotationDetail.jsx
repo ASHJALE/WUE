@@ -8,6 +8,7 @@ import {
   getQuotation,
   rejectQuotation,
 } from '../services/quotationService.js'
+import { ErrorAlert, LoadingState } from '../components/AppFeedback.jsx'
 
 function display(value) {
   if (value === null || value === undefined || value === '') return 'Not available'
@@ -53,8 +54,8 @@ export default function QuotationDetail() {
     finally { setAction('') }
   }
 
-  if (loading && !quotation) return <div className="text-center py-5"><div className="spinner-border text-success" role="status" /></div>
-  if (!quotation && error) return <div className="alert alert-danger"><p>{error}</p><button className="btn btn-sm btn-outline-danger" onClick={loadQuotation} type="button">Retry</button></div>
+  if (loading && !quotation) return <LoadingState label="Loading quotation details…" />
+  if (!quotation && error) return <ErrorAlert message={error} onRetry={loadQuotation} />
   if (!quotation) return null
 
   const metadata = [
@@ -78,13 +79,13 @@ export default function QuotationDetail() {
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div><h1 className="h2 mb-1">{quotation.quotation_number}</h1><p className="text-secondary mb-0">Estimate #{quotation.estimate_id} · {quotation.status}</p></div>
         <div className="d-flex flex-wrap gap-2">
-          {quotation.status === 'draft' && <><button className="btn btn-primary" disabled={Boolean(action)} onClick={() => runWorkflow('approval', approveQuotation)} type="button">Approve</button><button className="btn btn-outline-danger" disabled={Boolean(action)} onClick={() => runWorkflow('rejection', rejectQuotation)} type="button">Reject</button></>}
-          {quotation.status === 'approved' && <button className="btn btn-success" disabled={Boolean(action)} onClick={() => runWorkflow('completion', completeQuotation)} type="button">Complete</button>}
-          <button className="btn btn-outline-success" disabled={Boolean(action)} onClick={downloadPdf} type="button">{action === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}</button>
+          {quotation.status === 'draft' && <><button className="btn btn-primary" disabled={Boolean(action)} onClick={() => runWorkflow('approval', approveQuotation)} title="Approve this draft quotation" type="button">Approve</button><button className="btn btn-outline-danger" disabled={Boolean(action)} onClick={() => runWorkflow('rejection', rejectQuotation)} title="Reject this draft quotation" type="button">Reject</button></>}
+          {quotation.status === 'approved' && <button className="btn btn-success" disabled={Boolean(action)} onClick={() => runWorkflow('completion', completeQuotation)} title="Mark this approved quotation complete" type="button">Complete</button>}
+          <button className="btn btn-outline-success" disabled={Boolean(action)} onClick={downloadPdf} title="Download quotation as PDF" type="button">{action === 'pdf' ? 'Preparing PDF…' : 'Download PDF'}</button>
           <Link className="btn btn-outline-secondary" to="/quotations">Back</Link>
         </div>
       </div>
-      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      {error && <ErrorAlert message={error} />}
       <div className="row g-4 mb-4">
         <div className="col-lg-7"><div className="card border-0 shadow-sm h-100"><div className="card-body p-4"><h2 className="h5">Quotation metadata</h2><dl className="row mb-0">{metadata.map(([label, value]) => <div className="col-md-6 mb-3" key={label}><dt className="small text-secondary">{label}</dt><dd className="mb-0 text-break">{display(value)}</dd></div>)}</dl></div></div></div>
         <div className="col-lg-5"><div className="card border-0 shadow-sm h-100"><div className="card-body p-4"><h2 className="h5">Backend totals</h2><dl className="mb-0">{totals.map(([label, value]) => <div className="d-flex justify-content-between gap-3 border-bottom py-2" key={label}><dt className="text-secondary">{label}</dt><dd className="mb-0 fw-semibold">{quotation.currency_code} {display(value)}</dd></div>)}</dl></div></div></div>
