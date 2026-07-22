@@ -20,3 +20,8 @@ body {
 .navbar-brand svg {
   color: #75b798;
 }
+
+.estimate-card-image {
+  height: 12rem;
+  object-fit: cover;
+}

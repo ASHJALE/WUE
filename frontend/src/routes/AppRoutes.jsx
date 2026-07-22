@@ -5,6 +5,8 @@ import PublicOnlyRoute from '../components/PublicOnlyRoute.jsx'
 import BOM from '../pages/BOM.jsx'
 import Dashboard from '../pages/Dashboard.jsx'
 import Estimates from '../pages/Estimates.jsx'
+import EstimateCreate from '../pages/EstimateCreate.jsx'
+import EstimateDetail from '../pages/EstimateDetail.jsx'
 import Home from '../pages/Home.jsx'
 import Login from '../pages/Login.jsx'
 import NotFound from '../pages/NotFound.jsx'
@@ -23,6 +25,8 @@ function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="estimates" element={<Estimates />} />
+          <Route path="estimates/new" element={<EstimateCreate />} />
+          <Route path="estimates/:id" element={<EstimateDetail />} />
           <Route path="bom" element={<BOM />} />
           <Route path="quotations" element={<Quotations />} />
         </Route>
