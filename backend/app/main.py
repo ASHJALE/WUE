@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import check_database_connection
+from .routers.furniture_types import router as furniture_types_router
+from .routers.inventory import router as inventory_router
+from .routers.materials import router as materials_router
 
 
 app = FastAPI(
@@ -9,6 +12,10 @@ app = FastAPI(
     description="AI-Assisted Furniture Material Estimation and Quotation System",
     version="1.0.0",
 )
+
+app.include_router(furniture_types_router)
+app.include_router(materials_router)
+app.include_router(inventory_router)
 
 
 @app.get("/")

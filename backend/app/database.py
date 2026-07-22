@@ -1,10 +1,11 @@
 """SQLAlchemy engine configuration and database connectivity helpers."""
 
+from collections.abc import Generator
 from functools import lru_cache
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from .config import get_database_url
 
@@ -23,6 +24,22 @@ def get_engine() -> Engine:
         # Check pooled connections before use so stale connections are replaced.
         pool_pre_ping=True,
     )
+
+
+@lru_cache(maxsize=1)
+def get_session_factory() -> sessionmaker[Session]:
+    """Return the shared factory used for request-scoped database sessions."""
+    return sessionmaker(
+        bind=get_engine(),
+        autoflush=False,
+        expire_on_commit=False,
+    )
+
+
+def get_db() -> Generator[Session, None, None]:
+    """Provide one SQLAlchemy session per FastAPI request and always close it."""
+    with get_session_factory()() as session:
+        yield session
 
 
 def check_database_connection() -> None:
