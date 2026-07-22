@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import check_database_connection
+from .routers.auth import router as auth_router
 from .routers.estimates import router as estimates_router
 from .routers.furniture_materials import router as furniture_materials_router
 from .routers.furniture_types import router as furniture_types_router
@@ -18,6 +19,7 @@ app = FastAPI(
 )
 
 app.include_router(furniture_types_router)
+app.include_router(auth_router)
 app.include_router(materials_router)
 app.include_router(inventory_router)
 app.include_router(furniture_materials_router)

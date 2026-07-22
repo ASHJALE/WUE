@@ -28,3 +28,28 @@ def get_database_url() -> str:
         )
 
     return database_url
+
+
+def get_jwt_secret_key() -> str:
+    """Return the JWT signing key, with a documented local-only fallback."""
+    return os.getenv(
+        "JWT_SECRET_KEY",
+        "wue-development-only-secret-change-before-production",
+    )
+
+
+def get_jwt_algorithm() -> str:
+    """Return the configured symmetric JWT signing algorithm."""
+    return os.getenv("JWT_ALGORITHM", "HS256")
+
+
+def get_jwt_expiration_minutes() -> int:
+    """Return and validate the access-token lifetime."""
+    raw_value = os.getenv("JWT_EXPIRATION_MINUTES", "60")
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise RuntimeError("JWT_EXPIRATION_MINUTES must be an integer.") from error
+    if value <= 0:
+        raise RuntimeError("JWT_EXPIRATION_MINUTES must be greater than zero.")
+    return value
