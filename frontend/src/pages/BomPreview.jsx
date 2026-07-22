@@ -68,8 +68,8 @@ export default function BomPreview() {
           <Link className="btn btn-outline-secondary" to={`/estimates/${preview.estimate_id}`}>Back to estimate</Link>
           <Link
             className="btn btn-success"
-            state={{ estimateId: preview.estimate_id, action: 'create' }}
-            to={`/quotations?estimate_id=${preview.estimate_id}&action=create`}
+            state={{ estimateId: preview.estimate_id }}
+            to={`/quotations/new?estimate_id=${preview.estimate_id}`}
           >
             Create quotation
           </Link>

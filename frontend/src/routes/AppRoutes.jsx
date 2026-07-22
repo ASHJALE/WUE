@@ -12,6 +12,8 @@ import Home from '../pages/Home.jsx'
 import Login from '../pages/Login.jsx'
 import NotFound from '../pages/NotFound.jsx'
 import Quotations from '../pages/Quotations.jsx'
+import QuotationCreate from '../pages/QuotationCreate.jsx'
+import QuotationDetail from '../pages/QuotationDetail.jsx'
 import Register from '../pages/Register.jsx'
 
 function AppRoutes() {
@@ -31,6 +33,8 @@ function AppRoutes() {
           <Route path="estimates/:id/bom" element={<BomPreview />} />
           <Route path="bom" element={<BOM />} />
           <Route path="quotations" element={<Quotations />} />
+          <Route path="quotations/new" element={<QuotationCreate />} />
+          <Route path="quotations/:id" element={<QuotationDetail />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Route>
