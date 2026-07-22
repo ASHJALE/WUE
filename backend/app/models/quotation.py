@@ -49,7 +49,7 @@ class Quotation(Base):
             "currency_code ~ '^[A-Z]{3}$'", name="ck_quotations_currency_code"
         ),
         CheckConstraint(
-            "status IN ('draft', 'issued', 'accepted', 'rejected', 'expired')",
+            "status IN ('draft', 'approved', 'rejected', 'completed')",
             name="ck_quotations_status",
         ),
         CheckConstraint(
