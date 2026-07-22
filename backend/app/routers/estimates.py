@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.crud import ConflictError
@@ -10,6 +11,12 @@ from app.crud import estimate as crud
 from app.database import get_db
 from app.models.estimate import Estimate
 from app.schemas.estimate import EstimateCreate, EstimateRead, EstimateStatus, EstimateUpdate
+from app.schemas.calculation import BOMPreviewRead
+from app.services.bom import (
+    BOMPreviewConflictError,
+    BOMPreviewNotFoundError,
+    calculate_bom_preview,
+)
 
 router = APIRouter(prefix="/estimates", tags=["Estimates"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -73,6 +80,21 @@ def get_estimate(estimate_id: int, db: DbSession):
     if record is None:
         raise _not_found()
     return _response(record)
+
+
+@router.get("/{estimate_id}/bom-preview", response_model=BOMPreviewRead)
+def get_estimate_bom_preview(estimate_id: int, db: DbSession):
+    try:
+        return calculate_bom_preview(db, estimate_id)
+    except BOMPreviewNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except BOMPreviewConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    except SQLAlchemyError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="The BOM preview could not be calculated due to a database error.",
+        ) from error
 
 
 @router.put("/{estimate_id}", response_model=EstimateRead)
