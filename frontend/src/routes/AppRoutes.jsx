@@ -3,6 +3,7 @@ import MainLayout from '../layouts/MainLayout.jsx'
 import ProtectedRoute from '../components/ProtectedRoute.jsx'
 import PublicOnlyRoute from '../components/PublicOnlyRoute.jsx'
 import BOM from '../pages/BOM.jsx'
+import BomPreview from '../pages/BomPreview.jsx'
 import Dashboard from '../pages/Dashboard.jsx'
 import Estimates from '../pages/Estimates.jsx'
 import EstimateCreate from '../pages/EstimateCreate.jsx'
@@ -27,6 +28,7 @@ function AppRoutes() {
           <Route path="estimates" element={<Estimates />} />
           <Route path="estimates/new" element={<EstimateCreate />} />
           <Route path="estimates/:id" element={<EstimateDetail />} />
+          <Route path="estimates/:id/bom" element={<BomPreview />} />
           <Route path="bom" element={<BOM />} />
           <Route path="quotations" element={<Quotations />} />
         </Route>

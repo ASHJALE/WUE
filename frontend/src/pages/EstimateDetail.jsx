@@ -48,7 +48,10 @@ export default function EstimateDetail() {
     <section>
       <div className="d-flex align-items-center justify-content-between gap-3 mb-4">
         <div><h1 className="h2 mb-1">Estimate #{estimate.id}</h1><p className="text-secondary mb-0">Complete estimate response from WUE.</p></div>
-        <Link className="btn btn-outline-secondary" to="/estimates">Back to estimates</Link>
+        <div className="d-flex flex-wrap gap-2">
+          <Link className="btn btn-success" to={`/estimates/${estimate.id}/bom`}>Preview BOM</Link>
+          <Link className="btn btn-outline-secondary" to="/estimates">Back to estimates</Link>
+        </div>
       </div>
       <div className="card border-0 shadow-sm"><div className="card-body p-4">
         <dl className="row mb-0">
@@ -56,7 +59,7 @@ export default function EstimateDetail() {
             <div className="col-md-6 mb-3" key={label}><dt className="text-secondary small">{label}</dt><dd className="mb-0 text-break">{display(value)}</dd></div>
           ))}
         </dl>
-        <div className="alert alert-light border mb-0">BOM summary and quotation links are not included in the estimate response.</div>
+        <div className="alert alert-light border mb-0">BOM summary and quotation links are not included in the estimate response. Use Preview BOM to load the dedicated backend preview.</div>
       </div></div>
     </section>
   )
