@@ -8,7 +8,15 @@ from sqlalchemy.orm import Session
 from app.crud import ConflictError
 from app.crud import material as crud
 from app.database import get_db
-from app.schemas.material import MaterialCreate, MaterialRead, MaterialUpdate
+from app.dependencies.auth import CurrentUser
+from app.schemas.material import (
+    MaterialCreate,
+    MaterialRead,
+    MaterialRecommendRequest,
+    MaterialRecommendResponse,
+    MaterialUpdate,
+)
+from app.services.material_recommender import DISPLAY_NAMES, recommend_materials
 
 router = APIRouter(prefix="/materials", tags=["Materials"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -33,6 +41,18 @@ def list_materials(
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
 ):
     return crud.list_all(db, skip, limit)
+
+
+@router.post("/recommend", response_model=MaterialRecommendResponse)
+def recommend_furniture_materials(
+    data: MaterialRecommendRequest,
+    _current_user: CurrentUser,
+) -> MaterialRecommendResponse:
+    return MaterialRecommendResponse(
+        furniture_type=data.furniture_type,
+        display_name=DISPLAY_NAMES[data.furniture_type],
+        materials=recommend_materials(data.furniture_type),
+    )
 
 
 @router.get("/{material_id}", response_model=MaterialRead)

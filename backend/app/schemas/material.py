@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -54,3 +55,25 @@ class MaterialRead(MaterialBase):
     id: int
     created_at: datetime
     updated_at: datetime
+
+
+FurnitureRecommendationType = Literal["chair", "bed", "sofa", "dining_table", "lamp_shade"]
+
+
+class MaterialRecommendRequest(BaseModel):
+    furniture_type: FurnitureRecommendationType
+
+
+class MaterialRecommendation(BaseModel):
+    name: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    priority: Literal["Primary", "Alternative"]
+    quality: Literal["Economy", "Standard", "Premium"]
+    reason: str = Field(min_length=1)
+
+
+class MaterialRecommendResponse(BaseModel):
+    furniture_type: FurnitureRecommendationType
+    display_name: str
+    materials: list[MaterialRecommendation]
+    status: Literal["recommended"] = "recommended"

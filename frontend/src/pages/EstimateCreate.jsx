@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ErrorAlert } from '../components/AppFeedback.jsx'
@@ -6,6 +6,7 @@ import FurnitureImagePicker from '../components/FurnitureImagePicker.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
 import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageService.js'
+import { recommendMaterials } from '../services/materialRecommendationService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -40,6 +41,11 @@ export default function EstimateCreate() {
   const [classificationResult, setClassificationResult] = useState(null)
   const [confirmedFurnitureType, setConfirmedFurnitureType] = useState('')
   const [classificationConfirmed, setClassificationConfirmed] = useState(false)
+  const [recommendingMaterials, setRecommendingMaterials] = useState(false)
+  const [recommendationError, setRecommendationError] = useState('')
+  const [materialRecommendations, setMaterialRecommendations] = useState(null)
+  const recommendationRequestId = useRef(0)
+  const classificationRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -63,16 +69,29 @@ export default function EstimateCreate() {
     setClassificationResult(null)
     setConfirmedFurnitureType('')
     setClassificationConfirmed(false)
+    setRecommendationError('')
+    setMaterialRecommendations(null)
+    setRecommendingMaterials(false)
+    recommendationRequestId.current += 1
+    setClassifyingImage(false)
+    classificationRequestId.current += 1
   }
 
   async function handleImageUpload() {
     if (!selectedImage || uploadingImage) return
     setUploadingImage(true)
     setImageUploadError('')
+    setImageUploadResult(null)
     setClassificationError('')
     setClassificationResult(null)
     setConfirmedFurnitureType('')
     setClassificationConfirmed(false)
+    setRecommendationError('')
+    setMaterialRecommendations(null)
+    setRecommendingMaterials(false)
+    recommendationRequestId.current += 1
+    setClassifyingImage(false)
+    classificationRequestId.current += 1
     try {
       setImageUploadResult(await uploadFurnitureImage(selectedImage))
     } catch (requestError) {
@@ -84,17 +103,64 @@ export default function EstimateCreate() {
 
   async function handleImageClassification() {
     if (!imageUploadResult || classifyingImage) return
+    const requestId = classificationRequestId.current + 1
+    classificationRequestId.current = requestId
     setClassifyingImage(true)
     setClassificationError('')
+    setClassificationResult(null)
+    setConfirmedFurnitureType('')
+    setClassificationConfirmed(false)
+    setRecommendationError('')
+    setMaterialRecommendations(null)
+    setRecommendingMaterials(false)
+    recommendationRequestId.current += 1
     try {
       const result = await classifyFurnitureImage(imageUploadResult.upload_id)
-      setClassificationResult(result)
-      setConfirmedFurnitureType(result.predicted_class)
-      setClassificationConfirmed(false)
+      if (classificationRequestId.current === requestId) {
+        setClassificationResult(result)
+        setConfirmedFurnitureType(result.predicted_class)
+      }
     } catch (requestError) {
-      setClassificationError(getApiErrorMessage(requestError, 'The furniture image could not be analyzed.'))
+      if (classificationRequestId.current === requestId) {
+        setClassificationError(getApiErrorMessage(requestError, 'The furniture image could not be analyzed.'))
+      }
     } finally {
-      setClassifyingImage(false)
+      if (classificationRequestId.current === requestId) setClassifyingImage(false)
+    }
+  }
+
+  function handleConfirmedTypeChange(event) {
+    setConfirmedFurnitureType(event.target.value)
+    setClassificationConfirmed(false)
+    setRecommendationError('')
+    setMaterialRecommendations(null)
+    setRecommendingMaterials(false)
+    recommendationRequestId.current += 1
+  }
+
+  function confirmFurnitureType() {
+    setClassificationConfirmed(true)
+    setRecommendationError('')
+    setMaterialRecommendations(null)
+    setRecommendingMaterials(false)
+    recommendationRequestId.current += 1
+  }
+
+  async function handleMaterialRecommendation() {
+    if (!classificationConfirmed || !confirmedFurnitureType || recommendingMaterials) return
+    const requestId = recommendationRequestId.current + 1
+    recommendationRequestId.current = requestId
+    setRecommendingMaterials(true)
+    setRecommendationError('')
+    try {
+      const result = await recommendMaterials(confirmedFurnitureType)
+      if (recommendationRequestId.current === requestId) setMaterialRecommendations(result)
+    } catch (requestError) {
+      if (recommendationRequestId.current === requestId) {
+        setRecommendationError(getApiErrorMessage(requestError, 'Materials could not be recommended.'))
+      }
+    } finally {
+      if (recommendationRequestId.current === requestId) setRecommendingMaterials(false)
     }
   }
 
@@ -190,17 +256,14 @@ export default function EstimateCreate() {
                       <select
                         className="form-select"
                         id="confirmed-furniture-type"
-                        onChange={(event) => {
-                          setConfirmedFurnitureType(event.target.value)
-                          setClassificationConfirmed(false)
-                        }}
+                        onChange={handleConfirmedTypeChange}
                         value={confirmedFurnitureType}
                       >
                         {classificationResult.supported_classes.map((item) => (
                           <option key={item} value={item}>{furnitureClassNames[item]}</option>
                         ))}
                       </select>
-                      <button className="btn btn-success mt-3" onClick={() => setClassificationConfirmed(true)} type="button">
+                      <button className="btn btn-success mt-3" onClick={confirmFurnitureType} type="button">
                         Confirm Furniture Type
                       </button>
                       {classificationConfirmed && (
@@ -208,6 +271,57 @@ export default function EstimateCreate() {
                           Confirmed furniture type: {furnitureClassNames[confirmedFurnitureType]}
                         </p>
                       )}
+                    </div>
+                  )}
+                </div>
+              </section>
+              <section className="card border-0 bg-light mb-4" aria-labelledby="recommendation-heading">
+                <div className="card-body p-3 p-md-4">
+                  <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+                    <div>
+                      <h2 className="h5 mb-1" id="recommendation-heading">Material Recommendations</h2>
+                      <p className="text-secondary small mb-0">Get configurable suggestions for the confirmed furniture type.</p>
+                    </div>
+                    <button
+                      className="btn btn-outline-success flex-shrink-0"
+                      disabled={!classificationConfirmed || !confirmedFurnitureType || recommendingMaterials}
+                      onClick={handleMaterialRecommendation}
+                      type="button"
+                    >
+                      {recommendingMaterials && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                      {recommendingMaterials ? 'Recommending materials…' : 'Recommend Materials'}
+                    </button>
+                  </div>
+                  {!classificationConfirmed && <p className="text-secondary small mt-3 mb-0">Confirm a furniture type to enable recommendations.</p>}
+                  {recommendationError && <div className="alert alert-danger mt-3 mb-0" role="alert">{recommendationError}</div>}
+                  {materialRecommendations && (
+                    <div className="mt-4" aria-live="polite">
+                      <p className="fw-semibold">{materialRecommendations.materials.length} recommended materials</p>
+                      {['Primary', 'Alternative'].map((priority) => (
+                        <section className="mb-4" key={priority} aria-labelledby={`${priority.toLowerCase()}-materials-heading`}>
+                          <h3 className="h6" id={`${priority.toLowerCase()}-materials-heading`}>{priority} Materials</h3>
+                          <ul className="row g-3 list-unstyled mb-0">
+                            {materialRecommendations.materials.filter((item) => item.priority === priority).map((item) => (
+                              <li className="col-md-6" key={`${priority}-${item.name}`}>
+                                <article className="card border-0 shadow-sm h-100">
+                                  <div className="card-body">
+                                    <div className="d-flex flex-wrap gap-2 mb-2">
+                                      <span className={`badge ${priority === 'Primary' ? 'text-bg-success' : 'text-bg-secondary'}`}>{item.priority}</span>
+                                      <span className="badge text-bg-light border">{item.quality}</span>
+                                    </div>
+                                    <h4 className="h6 mb-1">{item.name}</h4>
+                                    <p className="small text-secondary mb-2">{item.category}</p>
+                                    <p className="small mb-0">{item.reason}</p>
+                                  </div>
+                                </article>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      ))}
+                      <div className="alert alert-info mb-0" role="note">
+                        These recommendations are configurable and may be refined after production AI integration.
+                      </div>
                     </div>
                   )}
                 </div>
