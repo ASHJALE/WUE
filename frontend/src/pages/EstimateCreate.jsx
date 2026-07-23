@@ -4,13 +4,14 @@ import { useAuth } from '../context/AuthContext.jsx'
 import { ErrorAlert } from '../components/AppFeedback.jsx'
 import FurnitureImagePicker from '../components/FurnitureImagePicker.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
-import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
+import { createEstimate, getEstimates, getFurnitureTypes } from '../services/estimateService.js'
 import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageService.js'
 import { recommendMaterials } from '../services/materialRecommendationService.js'
 import { generateStructuredBom } from '../services/bomGenerationService.js'
 import { estimateBomQuantities } from '../services/quantityEstimationService.js'
 import { calculatePreliminaryCost } from '../services/costCalculationService.js'
 import { assemblePreliminaryQuotation } from '../services/quotationAssemblyService.js'
+import { integratePhase7Estimate } from '../services/phase7IntegrationService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -55,6 +56,8 @@ export default function EstimateCreate() {
   const navigate = useNavigate()
   const [form, setForm] = useState(initialForm)
   const [furnitureTypes, setFurnitureTypes] = useState([])
+  const [ownedEstimates, setOwnedEstimates] = useState([])
+  const [targetEstimateId, setTargetEstimateId] = useState('')
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -89,21 +92,31 @@ export default function EstimateCreate() {
   const [assemblingQuotation, setAssemblingQuotation] = useState(false)
   const [quotationError, setQuotationError] = useState('')
   const [quotationPreview, setQuotationPreview] = useState(null)
+  const [savingIntegration, setSavingIntegration] = useState(false)
+  const [integrationError, setIntegrationError] = useState('')
+  const [integrationResult, setIntegrationResult] = useState(null)
+  const [workflowDirty, setWorkflowDirty] = useState(false)
   const recommendationRequestId = useRef(0)
   const classificationRequestId = useRef(0)
   const bomRequestId = useRef(0)
   const quantityRequestId = useRef(0)
   const costRequestId = useRef(0)
   const quotationRequestId = useRef(0)
+  const integrationRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
-    getFurnitureTypes()
-      .then((records) => { if (active) setFurnitureTypes(records.filter((item) => item.is_active)) })
+    Promise.all([getFurnitureTypes(), getEstimates({ user_id: user.id, limit: 200 })])
+      .then(([types, estimates]) => {
+        if (!active) return
+        setFurnitureTypes(types.filter((item) => item.is_active))
+        setOwnedEstimates(estimates)
+        if (estimates.length) setTargetEstimateId(String(estimates[0].id))
+      })
       .catch((requestError) => { if (active) setError(getApiErrorMessage(requestError, 'Furniture types could not be loaded.')) })
       .finally(() => { if (active) setLoadingTypes(false) })
     return () => { active = false }
-  }, [])
+  }, [user.id])
 
   function updateField(event) {
     const { name, value } = event.target
@@ -131,6 +144,10 @@ export default function EstimateCreate() {
     setQuotationError('')
     setQuotationPreview(null)
     quotationRequestId.current += 1
+    setSavingIntegration(false)
+    setIntegrationError('')
+    integrationRequestId.current += 1
+    if (integrationResult) setWorkflowDirty(true)
   }
 
   function handleDimensionChange(event) {
@@ -146,6 +163,14 @@ export default function EstimateCreate() {
   function handleQuotationCustomerChange(event) {
     setQuotationCustomer((current) => ({ ...current, [event.target.name]: event.target.value }))
     clearQuotationPreview()
+  }
+
+  function handleTargetEstimateChange(event) {
+    setTargetEstimateId(event.target.value)
+    setIntegrationResult(null)
+    setIntegrationError('')
+    setWorkflowDirty(Boolean(quotationPreview))
+    integrationRequestId.current += 1
   }
 
   function handleImageChange(file) {
@@ -413,6 +438,52 @@ export default function EstimateCreate() {
       }
     } finally {
       if (quotationRequestId.current === requestId) setAssemblingQuotation(false)
+    }
+  }
+
+  async function handlePhase7Integration() {
+    if (!quotationPreview || !targetEstimateId || savingIntegration) return
+    const confirmed = window.confirm(
+      `This will save the current AI-assisted estimate results to Estimate #${targetEstimateId}.`,
+    )
+    if (!confirmed) return
+    const requestId = integrationRequestId.current + 1
+    integrationRequestId.current = requestId
+    setSavingIntegration(true)
+    setIntegrationError('')
+    try {
+      const result = await integratePhase7Estimate(targetEstimateId, {
+        upload: {
+          upload_id: imageUploadResult.upload_id,
+          image_path: `uploads/furniture/${imageUploadResult.stored_filename}`,
+        },
+        classification: {
+          recognized_furniture_type: classificationResult.predicted_class,
+          confirmed_furniture_type: confirmedFurnitureType,
+          confidence: classificationResult.confidence,
+        },
+        dimensions: {
+          width: Number(dimensions.width),
+          depth: Number(dimensions.depth),
+          height: Number(dimensions.height),
+          unit: 'mm',
+        },
+        recommendations: materialRecommendations.materials,
+        bom: generatedBom.components,
+        quantity_estimates: quantityEstimates.components,
+        cost_summary: costResult,
+        preliminary_quotation: quotationPreview,
+      })
+      if (integrationRequestId.current === requestId) {
+        setIntegrationResult(result)
+        setWorkflowDirty(false)
+      }
+    } catch (requestError) {
+      if (integrationRequestId.current === requestId) {
+        setIntegrationError(getApiErrorMessage(requestError, 'Estimate results could not be saved.'))
+      }
+    } finally {
+      if (integrationRequestId.current === requestId) setSavingIntegration(false)
     }
   }
 
@@ -908,6 +979,41 @@ export default function EstimateCreate() {
                   </div>
                 </article>
               )}
+              <section className="card border-success mb-4 no-print" aria-labelledby="save-estimate-results-heading">
+                <div className="card-body p-3 p-md-4">
+                  <h2 className="h5" id="save-estimate-results-heading">Save Estimate Results</h2>
+                  <p className="text-secondary small">Persist the completed AI-assisted workflow to an estimate you own.</p>
+                  <label className="form-label" htmlFor="phase7-target-estimate">Target Estimate</label>
+                  <select className="form-select" id="phase7-target-estimate" onChange={handleTargetEstimateChange} value={targetEstimateId}>
+                    <option value="">Select an estimate</option>
+                    {ownedEstimates.map((item) => <option key={item.id} value={item.id}>Estimate #{item.id} — {item.status}</option>)}
+                  </select>
+                  {!ownedEstimates.length && <p className="alert alert-warning mt-3 mb-0">Create an estimate record before saving the completed workflow.</p>}
+                  <button
+                    aria-label="Save completed AI-assisted estimate results"
+                    className="btn btn-success mt-3"
+                    disabled={
+                      !quotationPreview
+                      || !targetEstimateId
+                      || savingIntegration
+                      || (Boolean(integrationResult) && !workflowDirty)
+                    }
+                    onClick={handlePhase7Integration}
+                    type="button"
+                  >
+                    {savingIntegration && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                    {savingIntegration ? 'Saving estimate results…' : 'Save Estimate Results'}
+                  </button>
+                  {workflowDirty && quotationPreview && <p className="text-warning-emphasis mt-2 mb-0" role="status">Unsaved changes</p>}
+                  {integrationError && <div className="alert alert-danger mt-3 mb-0" role="alert">{integrationError}</div>}
+                  {integrationResult && !workflowDirty && (
+                    <div className="alert alert-success mt-3 mb-0" role="status">
+                      <strong>Estimate results saved.</strong>{' '}
+                      <Link to={`/estimates/${integrationResult.estimate_id}`}>Open Estimate Details</Link>
+                    </div>
+                  )}
+                </div>
+              </section>
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>
                 <input className="form-control" id="estimate-user" readOnly value={`${user.username} (#${user.id})`} />

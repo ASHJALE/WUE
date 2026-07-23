@@ -22,6 +22,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from .furniture_type import FurnitureType
     from .quotation import Quotation
+    from .phase7_estimate_snapshot import Phase7EstimateSnapshot
     from .user import User
 
 
@@ -99,3 +100,6 @@ class Estimate(Base):
         foreign_keys=[recognized_furniture_type_id],
     )
     quotations: Mapped[list[Quotation]] = relationship(back_populates="estimate")
+    phase7_snapshot: Mapped[Phase7EstimateSnapshot | None] = relationship(
+        back_populates="estimate", uselist=False, cascade="all, delete-orphan"
+    )

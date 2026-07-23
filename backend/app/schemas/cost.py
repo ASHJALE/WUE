@@ -68,6 +68,8 @@ class LaborCostRead(BaseModel):
 
 
 class CostCalculateResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     furniture_type: FurnitureRecommendationType
     display_name: str
     currency: Literal["PHP"] = "PHP"

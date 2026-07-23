@@ -1,6 +1,7 @@
 """Validated, bounded local storage for furniture image uploads."""
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -32,8 +33,15 @@ def _metadata_path(upload_id: UUID) -> Path:
     return UPLOAD_DIRECTORY / f"{upload_id}.json"
 
 
-def find_owned_upload(upload_id: UUID, owner_user_id: int) -> Path | None:
-    """Resolve a server-issued upload without revealing other users' uploads."""
+@dataclass(frozen=True)
+class OwnedUpload:
+    path: Path
+    stored_filename: str
+    content_type: str
+
+
+def get_owned_upload(upload_id: UUID, owner_user_id: int) -> OwnedUpload | None:
+    """Return validated upload metadata for its owner only."""
     try:
         metadata = json.loads(_metadata_path(upload_id).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -41,13 +49,24 @@ def find_owned_upload(upload_id: UUID, owner_user_id: int) -> Path | None:
     if metadata.get("owner_user_id") != owner_user_id:
         return None
     stored_filename = metadata.get("stored_filename")
+    content_type = metadata.get("content_type")
     expected_prefix = f"{upload_id}."
-    if not isinstance(stored_filename, str) or not stored_filename.startswith(expected_prefix):
+    if (
+        not isinstance(stored_filename, str)
+        or not stored_filename.startswith(expected_prefix)
+        or content_type not in CONTENT_TYPE_EXTENSIONS
+    ):
         return None
     candidate = UPLOAD_DIRECTORY / stored_filename
     if candidate.parent.resolve() != UPLOAD_DIRECTORY.resolve() or not candidate.is_file():
         return None
-    return candidate
+    return OwnedUpload(candidate, stored_filename, content_type)
+
+
+def find_owned_upload(upload_id: UUID, owner_user_id: int) -> Path | None:
+    """Resolve a server-issued upload without revealing other users' uploads."""
+    owned_upload = get_owned_upload(upload_id, owner_user_id)
+    return owned_upload.path if owned_upload else None
 
 
 async def save_furniture_image(image: UploadFile | None, owner_user_id: int) -> ImageUploadRead:

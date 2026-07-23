@@ -3,6 +3,8 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -65,3 +67,8 @@ class EstimateRead(BaseModel):
     status: EstimateStatus
     created_at: datetime
     updated_at: datetime
+    integration_status: Literal["integrated", "not_integrated"] = "not_integrated"
+    phase7_snapshot_saved: bool = False
+    phase7_upload_id: UUID | None = None
+    saved_cost_summary: dict[str, Any] | None = None
+    preliminary_quotation_id: str | None = None

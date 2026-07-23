@@ -64,6 +64,7 @@ def _query():
         joinedload(Estimate.user),
         joinedload(Estimate.selected_furniture_type),
         joinedload(Estimate.recognized_furniture_type),
+        joinedload(Estimate.phase7_snapshot),
     )
 
 

@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.dependencies.auth import CurrentUser
 from app.schemas.image import ImageUploadRead
@@ -14,7 +15,7 @@ from app.services.image_classifier import (
     UnreadableImageError,
     image_classifier,
 )
-from app.services.images import find_owned_upload, save_furniture_image
+from app.services.images import find_owned_upload, get_owned_upload, save_furniture_image
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
@@ -49,3 +50,11 @@ def classify_furniture_image(upload_id: UUID, current_user: CurrentUser) -> Clas
         is_placeholder=result.is_placeholder,
         supported_classes=list(SUPPORTED_CLASSES),
     )
+
+
+@router.get("/{upload_id}/content", response_class=FileResponse)
+def get_furniture_image_content(upload_id: UUID, current_user: CurrentUser) -> FileResponse:
+    upload = get_owned_upload(upload_id, current_user.id)
+    if upload is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image upload not found.")
+    return FileResponse(upload.path, media_type=upload.content_type)
