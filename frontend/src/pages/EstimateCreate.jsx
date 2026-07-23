@@ -5,6 +5,7 @@ import { ErrorAlert } from '../components/AppFeedback.jsx'
 import FurnitureImagePicker from '../components/FurnitureImagePicker.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
+import { uploadFurnitureImage } from '../services/imageService.js'
 
 const initialForm = {
   input_method: 'predefined',
@@ -22,6 +23,10 @@ export default function EstimateCreate() {
   const [loadingTypes, setLoadingTypes] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [selectedImage, setSelectedImage] = useState(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageUploadError, setImageUploadError] = useState('')
+  const [imageUploadResult, setImageUploadResult] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -35,6 +40,25 @@ export default function EstimateCreate() {
   function updateField(event) {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  function handleImageChange(file) {
+    setSelectedImage(file)
+    setImageUploadError('')
+    setImageUploadResult(null)
+  }
+
+  async function handleImageUpload() {
+    if (!selectedImage || uploadingImage) return
+    setUploadingImage(true)
+    setImageUploadError('')
+    try {
+      setImageUploadResult(await uploadFurnitureImage(selectedImage))
+    } catch (requestError) {
+      setImageUploadError(getApiErrorMessage(requestError, 'The furniture image could not be uploaded.'))
+    } finally {
+      setUploadingImage(false)
+    }
   }
 
   async function handleSubmit(event) {
@@ -92,7 +116,14 @@ export default function EstimateCreate() {
             </div>
             {error && <ErrorAlert message={error} />}
             <form onSubmit={handleSubmit} noValidate>
-              <FurnitureImagePicker disabled={submitting} />
+              <FurnitureImagePicker
+                disabled={submitting}
+                onFileChange={handleImageChange}
+                onUpload={handleImageUpload}
+                uploadError={imageUploadError}
+                uploading={uploadingImage}
+                uploadResult={imageUploadResult}
+              />
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>
                 <input className="form-control" id="estimate-user" readOnly value={`${user.username} (#${user.id})`} />

@@ -18,7 +18,14 @@ export function formatImageSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
-export default function FurnitureImagePicker({ disabled = false }) {
+export default function FurnitureImagePicker({
+  disabled = false,
+  onFileChange,
+  onUpload,
+  uploadError = '',
+  uploading = false,
+  uploadResult = null,
+}) {
   const inputRef = useRef(null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -47,17 +54,19 @@ export default function FurnitureImagePicker({ disabled = false }) {
     setValidationMessage('')
     setSelectedFile(file)
     setPreviewUrl(URL.createObjectURL(file))
+    onFileChange?.(file)
   }
 
   function removeImage() {
     setSelectedFile(null)
     setPreviewUrl('')
     setValidationMessage('')
+    onFileChange?.(null)
     if (inputRef.current) inputRef.current.value = ''
   }
 
   return (
-    <fieldset className="furniture-image-picker border rounded-3 p-3 p-md-4 mb-4" disabled={disabled}>
+    <fieldset className="furniture-image-picker border rounded-3 p-3 p-md-4 mb-4" disabled={disabled || uploading}>
       <legend className="h5 float-none w-auto px-2 mb-2">Furniture Image</legend>
       <p className="text-secondary small mb-3" id="furniture-image-help">
         Choose one JPEG, PNG, or WebP image up to 5 MB. The image is previewed locally and is not uploaded yet.
@@ -107,6 +116,24 @@ export default function FurnitureImagePicker({ disabled = false }) {
           <FaImage className="text-success mb-3" size="2.25rem" aria-hidden="true" />
           <p className="mb-3">No furniture image selected</p>
           <button className="btn btn-success" onClick={openFilePicker} type="button">Choose Image</button>
+        </div>
+      )}
+
+      <button className="btn btn-success w-100 mt-3" disabled={!selectedFile || uploading} onClick={onUpload} type="button">
+        {uploading && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+        {uploading ? 'Uploading image…' : 'Upload Image'}
+      </button>
+
+      {uploadError && <div className="alert alert-danger mt-3 mb-0" role="alert">{uploadError}</div>}
+      {uploadResult && (
+        <div className="alert alert-success mt-3 mb-0" role="status">
+          <h3 className="h6">Image uploaded successfully</h3>
+          <dl className="row small mb-0">
+            <dt className="col-sm-4">Status</dt><dd className="col-sm-8">{uploadResult.status}</dd>
+            <dt className="col-sm-4">Original filename</dt><dd className="col-sm-8 text-break">{uploadResult.original_filename}</dd>
+            <dt className="col-sm-4">File size</dt><dd className="col-sm-8">{formatImageSize(uploadResult.size_bytes)}</dd>
+            <dt className="col-sm-4">Upload ID</dt><dd className="col-sm-8 text-break font-monospace">{uploadResult.upload_id}</dd>
+          </dl>
         </div>
       )}
     </fieldset>

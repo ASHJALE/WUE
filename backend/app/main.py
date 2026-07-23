@@ -7,6 +7,7 @@ from .routers.estimates import router as estimates_router
 from .routers.furniture_materials import router as furniture_materials_router
 from .routers.furniture_types import router as furniture_types_router
 from .routers.inventory import router as inventory_router
+from .routers.images import router as images_router
 from .routers.materials import router as materials_router
 from .routers.quotations import router as quotations_router
 from .routers.quotation_actions import router as quotation_actions_router
@@ -22,6 +23,7 @@ app.include_router(furniture_types_router)
 app.include_router(auth_router)
 app.include_router(materials_router)
 app.include_router(inventory_router)
+app.include_router(images_router)
 app.include_router(furniture_materials_router)
 app.include_router(estimates_router)
 app.include_router(quotations_router)
