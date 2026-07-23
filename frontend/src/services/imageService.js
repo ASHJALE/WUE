@@ -6,3 +6,8 @@ export async function uploadFurnitureImage(file) {
   const response = await apiClient.post('/images/upload', formData)
   return response.data
 }
+
+export async function classifyFurnitureImage(uploadId) {
+  const response = await apiClient.post(`/images/${uploadId}/classify`)
+  return response.data
+}

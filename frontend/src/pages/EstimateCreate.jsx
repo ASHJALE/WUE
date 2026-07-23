@@ -5,7 +5,15 @@ import { ErrorAlert } from '../components/AppFeedback.jsx'
 import FurnitureImagePicker from '../components/FurnitureImagePicker.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
-import { uploadFurnitureImage } from '../services/imageService.js'
+import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageService.js'
+
+const furnitureClassNames = {
+  chair: 'Chair',
+  bed: 'Bed',
+  sofa: 'Sofa',
+  dining_table: 'Dining Table',
+  lamp_shade: 'Lamp Shade',
+}
 
 const initialForm = {
   input_method: 'predefined',
@@ -27,6 +35,11 @@ export default function EstimateCreate() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imageUploadError, setImageUploadError] = useState('')
   const [imageUploadResult, setImageUploadResult] = useState(null)
+  const [classifyingImage, setClassifyingImage] = useState(false)
+  const [classificationError, setClassificationError] = useState('')
+  const [classificationResult, setClassificationResult] = useState(null)
+  const [confirmedFurnitureType, setConfirmedFurnitureType] = useState('')
+  const [classificationConfirmed, setClassificationConfirmed] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -46,18 +59,42 @@ export default function EstimateCreate() {
     setSelectedImage(file)
     setImageUploadError('')
     setImageUploadResult(null)
+    setClassificationError('')
+    setClassificationResult(null)
+    setConfirmedFurnitureType('')
+    setClassificationConfirmed(false)
   }
 
   async function handleImageUpload() {
     if (!selectedImage || uploadingImage) return
     setUploadingImage(true)
     setImageUploadError('')
+    setClassificationError('')
+    setClassificationResult(null)
+    setConfirmedFurnitureType('')
+    setClassificationConfirmed(false)
     try {
       setImageUploadResult(await uploadFurnitureImage(selectedImage))
     } catch (requestError) {
       setImageUploadError(getApiErrorMessage(requestError, 'The furniture image could not be uploaded.'))
     } finally {
       setUploadingImage(false)
+    }
+  }
+
+  async function handleImageClassification() {
+    if (!imageUploadResult || classifyingImage) return
+    setClassifyingImage(true)
+    setClassificationError('')
+    try {
+      const result = await classifyFurnitureImage(imageUploadResult.upload_id)
+      setClassificationResult(result)
+      setConfirmedFurnitureType(result.predicted_class)
+      setClassificationConfirmed(false)
+    } catch (requestError) {
+      setClassificationError(getApiErrorMessage(requestError, 'The furniture image could not be analyzed.'))
+    } finally {
+      setClassifyingImage(false)
     }
   }
 
@@ -124,6 +161,57 @@ export default function EstimateCreate() {
                 uploading={uploadingImage}
                 uploadResult={imageUploadResult}
               />
+              <section className="card border-0 bg-light mb-4" aria-labelledby="classification-heading">
+                <div className="card-body p-3 p-md-4">
+                  <h2 className="h5" id="classification-heading">Furniture Classification</h2>
+                  <p className="text-secondary small">Analyze an uploaded image with the WUE development classifier.</p>
+                  <button
+                    className="btn btn-outline-success"
+                    disabled={!imageUploadResult || classifyingImage}
+                    onClick={handleImageClassification}
+                    type="button"
+                  >
+                    {classifyingImage && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                    {classifyingImage ? 'Analyzing furniture…' : 'Analyze Furniture'}
+                  </button>
+                  {!imageUploadResult && <p className="text-secondary small mt-2 mb-0">Upload an image before analysis.</p>}
+                  {classificationError && <div className="alert alert-danger mt-3 mb-0" role="alert">{classificationError}</div>}
+                  {classificationResult && (
+                    <div className="classification-result mt-4" aria-live="polite">
+                      <div className="alert alert-warning" role="note">
+                        <strong>Development classifier:</strong> this deterministic placeholder is for workflow testing and is not production-ready AI.
+                      </div>
+                      <dl className="row mb-3">
+                        <dt className="col-sm-5">Predicted furniture type</dt><dd className="col-sm-7">{classificationResult.display_name}</dd>
+                        <dt className="col-sm-5">Confidence</dt><dd className="col-sm-7">{(classificationResult.confidence * 100).toFixed(1)}%</dd>
+                        <dt className="col-sm-5">Model</dt><dd className="col-sm-7">{classificationResult.model_name} v{classificationResult.model_version}</dd>
+                      </dl>
+                      <label className="form-label" htmlFor="confirmed-furniture-type">Confirm or correct furniture type</label>
+                      <select
+                        className="form-select"
+                        id="confirmed-furniture-type"
+                        onChange={(event) => {
+                          setConfirmedFurnitureType(event.target.value)
+                          setClassificationConfirmed(false)
+                        }}
+                        value={confirmedFurnitureType}
+                      >
+                        {classificationResult.supported_classes.map((item) => (
+                          <option key={item} value={item}>{furnitureClassNames[item]}</option>
+                        ))}
+                      </select>
+                      <button className="btn btn-success mt-3" onClick={() => setClassificationConfirmed(true)} type="button">
+                        Confirm Furniture Type
+                      </button>
+                      {classificationConfirmed && (
+                        <p className="alert alert-success mt-3 mb-0" role="status">
+                          Confirmed furniture type: {furnitureClassNames[confirmedFurnitureType]}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </section>
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>
                 <input className="form-control" id="estimate-user" readOnly value={`${user.username} (#${user.id})`} />

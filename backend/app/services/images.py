@@ -1,5 +1,6 @@
 """Validated, bounded local storage for furniture image uploads."""
 
+import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -27,7 +28,29 @@ def _matches_image_signature(content_type: str, header: bytes) -> bool:
     return False
 
 
-async def save_furniture_image(image: UploadFile | None) -> ImageUploadRead:
+def _metadata_path(upload_id: UUID) -> Path:
+    return UPLOAD_DIRECTORY / f"{upload_id}.json"
+
+
+def find_owned_upload(upload_id: UUID, owner_user_id: int) -> Path | None:
+    """Resolve a server-issued upload without revealing other users' uploads."""
+    try:
+        metadata = json.loads(_metadata_path(upload_id).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if metadata.get("owner_user_id") != owner_user_id:
+        return None
+    stored_filename = metadata.get("stored_filename")
+    expected_prefix = f"{upload_id}."
+    if not isinstance(stored_filename, str) or not stored_filename.startswith(expected_prefix):
+        return None
+    candidate = UPLOAD_DIRECTORY / stored_filename
+    if candidate.parent.resolve() != UPLOAD_DIRECTORY.resolve() or not candidate.is_file():
+        return None
+    return candidate
+
+
+async def save_furniture_image(image: UploadFile | None, owner_user_id: int) -> ImageUploadRead:
     if image is None or not image.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A furniture image is required.")
 
@@ -42,6 +65,7 @@ async def save_furniture_image(image: UploadFile | None) -> ImageUploadRead:
     upload_id: UUID = uuid4()
     stored_filename = f"{upload_id}{extension}"
     destination = UPLOAD_DIRECTORY / stored_filename
+    metadata_destination = _metadata_path(upload_id)
     size_bytes = 0
     header = b""
 
@@ -64,11 +88,25 @@ async def save_furniture_image(image: UploadFile | None) -> ImageUploadRead:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="The uploaded file is not a valid image.",
             )
+        metadata_destination.write_text(
+            json.dumps(
+                {
+                    "upload_id": str(upload_id),
+                    "owner_user_id": owner_user_id,
+                    "stored_filename": stored_filename,
+                    "content_type": content_type,
+                    "size_bytes": size_bytes,
+                }
+            ),
+            encoding="utf-8",
+        )
     except HTTPException:
         destination.unlink(missing_ok=True)
+        metadata_destination.unlink(missing_ok=True)
         raise
     except OSError as error:
         destination.unlink(missing_ok=True)
+        metadata_destination.unlink(missing_ok=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="The image could not be saved.",
