@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
 import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageService.js'
 import { recommendMaterials } from '../services/materialRecommendationService.js'
+import { generateStructuredBom } from '../services/bomGenerationService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -44,8 +45,12 @@ export default function EstimateCreate() {
   const [recommendingMaterials, setRecommendingMaterials] = useState(false)
   const [recommendationError, setRecommendationError] = useState('')
   const [materialRecommendations, setMaterialRecommendations] = useState(null)
+  const [generatingBom, setGeneratingBom] = useState(false)
+  const [bomError, setBomError] = useState('')
+  const [generatedBom, setGeneratedBom] = useState(null)
   const recommendationRequestId = useRef(0)
   const classificationRequestId = useRef(0)
+  const bomRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -75,6 +80,10 @@ export default function EstimateCreate() {
     recommendationRequestId.current += 1
     setClassifyingImage(false)
     classificationRequestId.current += 1
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
   }
 
   async function handleImageUpload() {
@@ -92,6 +101,10 @@ export default function EstimateCreate() {
     recommendationRequestId.current += 1
     setClassifyingImage(false)
     classificationRequestId.current += 1
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
     try {
       setImageUploadResult(await uploadFurnitureImage(selectedImage))
     } catch (requestError) {
@@ -114,6 +127,10 @@ export default function EstimateCreate() {
     setMaterialRecommendations(null)
     setRecommendingMaterials(false)
     recommendationRequestId.current += 1
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
     try {
       const result = await classifyFurnitureImage(imageUploadResult.upload_id)
       if (classificationRequestId.current === requestId) {
@@ -136,6 +153,10 @@ export default function EstimateCreate() {
     setMaterialRecommendations(null)
     setRecommendingMaterials(false)
     recommendationRequestId.current += 1
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
   }
 
   function confirmFurnitureType() {
@@ -144,6 +165,10 @@ export default function EstimateCreate() {
     setMaterialRecommendations(null)
     setRecommendingMaterials(false)
     recommendationRequestId.current += 1
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
   }
 
   async function handleMaterialRecommendation() {
@@ -152,6 +177,10 @@ export default function EstimateCreate() {
     recommendationRequestId.current = requestId
     setRecommendingMaterials(true)
     setRecommendationError('')
+    setGeneratingBom(false)
+    setBomError('')
+    setGeneratedBom(null)
+    bomRequestId.current += 1
     try {
       const result = await recommendMaterials(confirmedFurnitureType)
       if (recommendationRequestId.current === requestId) setMaterialRecommendations(result)
@@ -161,6 +190,27 @@ export default function EstimateCreate() {
       }
     } finally {
       if (recommendationRequestId.current === requestId) setRecommendingMaterials(false)
+    }
+  }
+
+  async function handleBomGeneration() {
+    if (!materialRecommendations || generatingBom) return
+    const requestId = bomRequestId.current + 1
+    bomRequestId.current = requestId
+    setGeneratingBom(true)
+    setBomError('')
+    try {
+      const result = await generateStructuredBom(
+        materialRecommendations.furniture_type,
+        materialRecommendations.materials,
+      )
+      if (bomRequestId.current === requestId) setGeneratedBom(result)
+    } catch (requestError) {
+      if (bomRequestId.current === requestId) {
+        setBomError(getApiErrorMessage(requestError, 'The structured BOM could not be generated.'))
+      }
+    } finally {
+      if (bomRequestId.current === requestId) setGeneratingBom(false)
     }
   }
 
@@ -321,6 +371,60 @@ export default function EstimateCreate() {
                       ))}
                       <div className="alert alert-info mb-0" role="note">
                         These recommendations are configurable and may be refined after production AI integration.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+              <section className="card border-0 bg-light mb-4" aria-labelledby="generated-bom-heading">
+                <div className="card-body p-3 p-md-4">
+                  <div className="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+                    <div>
+                      <h2 className="h5 mb-1" id="generated-bom-heading">Structured Bill of Materials</h2>
+                      <p className="text-secondary small mb-0">Convert the current recommendations into furniture components.</p>
+                    </div>
+                    <button
+                      className="btn btn-outline-success flex-shrink-0"
+                      disabled={!materialRecommendations || generatingBom}
+                      onClick={handleBomGeneration}
+                      type="button"
+                    >
+                      {generatingBom && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                      {generatingBom ? 'Generating BOM…' : 'Generate BOM'}
+                    </button>
+                  </div>
+                  {!materialRecommendations && <p className="text-secondary small mt-3 mb-0">Generate material recommendations before creating a BOM.</p>}
+                  {bomError && <div className="alert alert-danger mt-3 mb-0" role="alert">{bomError}</div>}
+                  {generatedBom && (
+                    <div className="mt-4" aria-live="polite">
+                      <p className="fw-semibold">{generatedBom.components.length} BOM components</p>
+                      <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0">
+                          <caption className="visually-hidden">Generated bill of materials components</caption>
+                          <thead><tr>
+                            <th scope="col">Component</th>
+                            <th scope="col">Recommended Material</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Source</th>
+                            <th scope="col">Unit</th>
+                            <th scope="col">Notes</th>
+                          </tr></thead>
+                          <tbody>
+                            {generatedBom.components.map((item) => (
+                              <tr key={item.component}>
+                                <th scope="row">{item.component}</th>
+                                <td>{item.recommended_material}</td>
+                                <td>{item.category}</td>
+                                <td>{item.source}</td>
+                                <td>{item.unit}</td>
+                                <td>{item.notes}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="alert alert-info mt-3 mb-0" role="note">
+                        Quantities will be calculated during the next estimation phase.
                       </div>
                     </div>
                   )}
