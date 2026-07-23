@@ -101,6 +101,24 @@ dt {
   object-fit: cover;
 }
 
+.furniture-image-picker {
+  border-color: #c9d8d2 !important;
+  background: #fbfdfc;
+}
+
+.furniture-image-empty {
+  border: 2px dashed #9fbdb1;
+  background: #f1f8f5;
+}
+
+.furniture-image-preview {
+  display: block;
+  width: 100%;
+  max-height: 18rem;
+  object-fit: contain;
+  background: #eef3f1;
+}
+
 .dashboard-chart {
   position: relative;
   min-height: 18rem;
@@ -122,6 +140,10 @@ dt {
 
   .dashboard-chart {
     min-height: 15rem;
+  }
+
+  .furniture-image-preview {
+    max-height: 14rem;
   }
 }
 

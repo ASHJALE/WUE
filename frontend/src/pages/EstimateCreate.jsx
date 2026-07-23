@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 import { ErrorAlert } from '../components/AppFeedback.jsx'
+import FurnitureImagePicker from '../components/FurnitureImagePicker.jsx'
 import { getApiErrorMessage } from '../services/apiErrors.js'
 import { createEstimate, getFurnitureTypes } from '../services/estimateService.js'
 
@@ -91,6 +92,7 @@ export default function EstimateCreate() {
             </div>
             {error && <ErrorAlert message={error} />}
             <form onSubmit={handleSubmit} noValidate>
+              <FurnitureImagePicker disabled={submitting} />
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>
                 <input className="form-control" id="estimate-user" readOnly value={`${user.username} (#${user.id})`} />
