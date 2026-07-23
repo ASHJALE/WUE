@@ -9,6 +9,7 @@ import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageS
 import { recommendMaterials } from '../services/materialRecommendationService.js'
 import { generateStructuredBom } from '../services/bomGenerationService.js'
 import { estimateBomQuantities } from '../services/quantityEstimationService.js'
+import { calculatePreliminaryCost } from '../services/costCalculationService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -33,6 +34,20 @@ const dimensionDefaults = {
   dining_table: { width: '1800', depth: '900', height: '750' },
   lamp_shade: { width: '350', depth: '350', height: '600' },
 }
+
+const laborHourDefaults = {
+  chair: '8',
+  bed: '14',
+  sofa: '18',
+  dining_table: '12',
+  lamp_shade: '5',
+}
+
+const phpCurrency = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  minimumFractionDigits: 2,
+})
 
 export default function EstimateCreate() {
   const { user } = useAuth()
@@ -61,10 +76,15 @@ export default function EstimateCreate() {
   const [estimatingQuantities, setEstimatingQuantities] = useState(false)
   const [quantityError, setQuantityError] = useState('')
   const [quantityEstimates, setQuantityEstimates] = useState(null)
+  const [costInputs, setCostInputs] = useState({ labor_hours: '8', hourly_rate: '150', profit_margin_percent: '20' })
+  const [calculatingCost, setCalculatingCost] = useState(false)
+  const [costError, setCostError] = useState('')
+  const [costResult, setCostResult] = useState(null)
   const recommendationRequestId = useRef(0)
   const classificationRequestId = useRef(0)
   const bomRequestId = useRef(0)
   const quantityRequestId = useRef(0)
+  const costRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -85,11 +105,24 @@ export default function EstimateCreate() {
     setQuantityError('')
     setQuantityEstimates(null)
     quantityRequestId.current += 1
+    clearCostResult()
+  }
+
+  function clearCostResult() {
+    setCalculatingCost(false)
+    setCostError('')
+    setCostResult(null)
+    costRequestId.current += 1
   }
 
   function handleDimensionChange(event) {
     setDimensions((current) => ({ ...current, [event.target.name]: event.target.value }))
     clearQuantityEstimate()
+  }
+
+  function handleCostInputChange(event) {
+    setCostInputs((current) => ({ ...current, [event.target.name]: event.target.value }))
+    clearCostResult()
   }
 
   function handleImageChange(file) {
@@ -264,19 +297,64 @@ export default function EstimateCreate() {
     quantityRequestId.current = requestId
     setEstimatingQuantities(true)
     setQuantityError('')
+    clearCostResult()
     try {
       const result = await estimateBomQuantities(
         generatedBom.furniture_type,
         numericDimensions,
         generatedBom.components,
       )
-      if (quantityRequestId.current === requestId) setQuantityEstimates(result)
+      if (quantityRequestId.current === requestId) {
+        setQuantityEstimates(result)
+        setCostInputs((current) => ({
+          ...current,
+          labor_hours: laborHourDefaults[result.furniture_type],
+        }))
+      }
     } catch (requestError) {
       if (quantityRequestId.current === requestId) {
         setQuantityError(getApiErrorMessage(requestError, 'Material quantities could not be estimated.'))
       }
     } finally {
       if (quantityRequestId.current === requestId) setEstimatingQuantities(false)
+    }
+  }
+
+  async function handleCostCalculation() {
+    if (!quantityEstimates || calculatingCost) return
+    const laborHours = Number(costInputs.labor_hours)
+    const hourlyRate = Number(costInputs.hourly_rate)
+    const profitMargin = Number(costInputs.profit_margin_percent)
+    if (!Number.isFinite(laborHours) || laborHours < 0) {
+      setCostError('Labor hours must be zero or greater.')
+      return
+    }
+    if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
+      setCostError('Hourly rate must be zero or greater.')
+      return
+    }
+    if (!Number.isFinite(profitMargin) || profitMargin < 0 || profitMargin > 100) {
+      setCostError('Profit margin must be between 0 and 100 percent.')
+      return
+    }
+    const requestId = costRequestId.current + 1
+    costRequestId.current = requestId
+    setCalculatingCost(true)
+    setCostError('')
+    try {
+      const result = await calculatePreliminaryCost(
+        quantityEstimates.furniture_type,
+        quantityEstimates.components,
+        { hours: laborHours, hourly_rate: hourlyRate },
+        profitMargin,
+      )
+      if (costRequestId.current === requestId) setCostResult(result)
+    } catch (requestError) {
+      if (costRequestId.current === requestId) {
+        setCostError(getApiErrorMessage(requestError, 'The preliminary cost could not be calculated.'))
+      }
+    } finally {
+      if (costRequestId.current === requestId) setCalculatingCost(false)
     }
   }
 
@@ -567,6 +645,89 @@ export default function EstimateCreate() {
                       </div>
                       <div className="alert alert-warning mt-3 mb-0" role="note">
                         These are preliminary engineering estimates and will be refined during pricing.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+              <section className="card border-0 bg-light mb-4" aria-labelledby="cost-calculation-heading">
+                <div className="card-body p-3 p-md-4">
+                  <h2 className="h5" id="cost-calculation-heading">Preliminary Cost Calculation</h2>
+                  <p className="text-secondary small">Configure labor and profit assumptions for the current quantity estimate.</p>
+                  <fieldset disabled={!quantityEstimates || calculatingCost}>
+                    <legend className="visually-hidden">Labor and profit inputs</legend>
+                    <div className="row g-3">
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="labor-hours">Labor Hours</label>
+                        <input className="form-control" id="labor-hours" min="0" name="labor_hours" onChange={handleCostInputChange} required step="0.25" type="number" value={costInputs.labor_hours} />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="hourly-rate">Hourly Rate (PHP)</label>
+                        <input className="form-control" id="hourly-rate" min="0" name="hourly_rate" onChange={handleCostInputChange} required step="0.01" type="number" value={costInputs.hourly_rate} />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="profit-margin-percent">Profit Margin (%)</label>
+                        <input className="form-control" id="profit-margin-percent" max="100" min="0" name="profit_margin_percent" onChange={handleCostInputChange} required step="0.01" type="number" value={costInputs.profit_margin_percent} />
+                      </div>
+                    </div>
+                  </fieldset>
+                  <button
+                    className="btn btn-outline-success mt-3"
+                    disabled={!quantityEstimates || calculatingCost}
+                    onClick={handleCostCalculation}
+                    type="button"
+                  >
+                    {calculatingCost && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                    {calculatingCost ? 'Calculating cost…' : 'Calculate Cost'}
+                  </button>
+                  {!quantityEstimates && <p className="text-secondary small mt-2 mb-0">Estimate component quantities before calculating cost.</p>}
+                  {costError && <div className="alert alert-danger mt-3 mb-0" role="alert">{costError}</div>}
+                  {costResult && (
+                    <div className="mt-4" aria-live="polite">
+                      <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0">
+                          <caption className="visually-hidden">Preliminary itemized component costs</caption>
+                          <thead><tr>
+                            <th scope="col">Component</th>
+                            <th scope="col">Material</th>
+                            <th scope="col">Estimated Quantity</th>
+                            <th scope="col">Unit</th>
+                            <th scope="col">Unit Price</th>
+                            <th scope="col">Subtotal</th>
+                          </tr></thead>
+                          <tbody>
+                            {costResult.components.map((item) => (
+                              <tr key={item.component}>
+                                <th scope="row">{item.component}</th>
+                                <td>{item.material}</td>
+                                <td>{item.estimated_quantity}</td>
+                                <td>{item.unit}</td>
+                                <td>{phpCurrency.format(Number(item.unit_price))}</td>
+                                <td>{phpCurrency.format(Number(item.subtotal))}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <section className="card border-success mt-3" aria-labelledby="cost-summary-heading">
+                        <div className="card-body">
+                          <h3 className="h6" id="cost-summary-heading">Cost Summary</h3>
+                          <dl className="row mb-0">
+                            <dt className="col-sm-7">Total Material Cost</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(costResult.total_material_cost))}</dd>
+                            <dt className="col-sm-7">Labor Hours</dt><dd className="col-sm-5 text-sm-end">{costResult.labor.hours}</dd>
+                            <dt className="col-sm-7">Hourly Rate</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(costResult.labor.hourly_rate))}</dd>
+                            <dt className="col-sm-7">Labor Cost</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(costResult.labor.labor_cost))}</dd>
+                            <dt className="col-sm-7">Profit Margin</dt><dd className="col-sm-5 text-sm-end">{costResult.profit_margin_percent}%</dd>
+                            <dt className="col-sm-7">Profit Amount</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(costResult.profit_amount))}</dd>
+                            <dt className="col-sm-7 fs-5">Final Estimated Cost</dt><dd className="col-sm-5 text-sm-end fs-5 fw-bold">{phpCurrency.format(Number(costResult.final_estimated_cost))}</dd>
+                          </dl>
+                        </div>
+                      </section>
+                      <div className="alert alert-warning mt-3 mb-2" role="note">
+                        This preliminary estimate includes material cost, labor cost, and profit only. No overhead cost is included.
+                      </div>
+                      <div className="alert alert-info mb-0" role="note">
+                        Material prices are configurable preliminary values and may be updated by an administrator or supplier integration.
                       </div>
                     </div>
                   )}
