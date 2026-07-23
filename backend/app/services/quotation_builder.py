@@ -44,12 +44,20 @@ def assemble_preliminary_quotation(
         ),
         project=PreliminaryProjectRead(name=data.customer.project_name),
         furniture=PreliminaryFurnitureRead(
-            furniture_type=classification.predicted_class,
-            display_name=classification.display_name,
+            furniture_type=classification.confirmed_class or classification.predicted_class,
+            recognized_furniture_type=classification.predicted_class,
+            display_name=(
+                classification.display_name
+                if not classification.confirmed_class
+                or classification.confirmed_class == classification.predicted_class
+                else classification.confirmed_class.replace("_", " ").title()
+            ),
             confidence=classification.confidence,
             model_name=classification.model_name,
             model_version=classification.model_version,
             is_placeholder=classification.is_placeholder,
+            model_backend=classification.model.backend if classification.model else None,
+            model_mode=classification.model.mode if classification.model else None,
         ),
         recommendations=data.recommendations,
         bom=data.bom,

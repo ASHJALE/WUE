@@ -89,7 +89,8 @@ class PreliminaryQuotationAssemble(BaseModel):
 
     @model_validator(mode="after")
     def validate_sections_are_consistent(self):
-        if self.classification.predicted_class != self.cost_summary.furniture_type:
+        selected_type = self.classification.confirmed_class or self.classification.predicted_class
+        if selected_type != self.cost_summary.furniture_type:
             raise ValueError("Classification and cost summary furniture types must match.")
         bom_components = {item.component for item in self.bom}
         quantity_components = {item.component for item in self.quantity_estimates}
@@ -110,11 +111,14 @@ class PreliminaryProjectRead(BaseModel):
 
 class PreliminaryFurnitureRead(BaseModel):
     furniture_type: FurnitureClass
+    recognized_furniture_type: FurnitureClass | None = None
     display_name: str
     confidence: float = Field(ge=0, le=1)
     model_name: str
     model_version: str
     is_placeholder: bool
+    model_backend: str | None = None
+    model_mode: str | None = None
 
 
 class PreliminaryQuotationRead(BaseModel):

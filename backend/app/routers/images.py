@@ -9,8 +9,15 @@ from fastapi.responses import FileResponse
 
 from app.dependencies.auth import CurrentUser
 from app.schemas.image import ImageUploadRead
-from app.schemas.classification import ClassificationRead
+from app.schemas.classification import (
+    ClassificationRead,
+    ClassifierModelRead,
+    FurnitureTypePrediction,
+    RecognizedFurnitureType,
+)
 from app.services.image_classifier import (
+    ClassifierUnavailableError,
+    ModelOutputError,
     SUPPORTED_CLASSES,
     UnreadableImageError,
     image_classifier,
@@ -40,15 +47,44 @@ def classify_furniture_image(upload_id: UUID, current_user: CurrentUser) -> Clas
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(error),
         ) from error
+    except ClassifierUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The furniture classifier is currently unavailable. Select a furniture type manually.",
+        ) from error
+    except ModelOutputError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The furniture classifier returned an invalid result.",
+        ) from error
     return ClassificationRead(
         upload_id=upload_id,
         predicted_class=result.predicted_class,
         display_name=result.display_name,
         confidence=result.confidence,
-        model_name=result.model_name,
         model_version=result.model_version,
-        is_placeholder=result.is_placeholder,
+        is_placeholder=result.model_mode == "development_fallback",
         supported_classes=list(SUPPORTED_CLASSES),
+        recognized_furniture_type=RecognizedFurnitureType(
+            key=result.predicted_class,
+            name=result.display_name,
+        ),
+        confidence_threshold=result.confidence_threshold,
+        low_confidence=not result.passes_threshold,
+        predictions=[
+            FurnitureTypePrediction(
+                key=prediction.key,
+                name=prediction.name,
+                confidence=prediction.confidence,
+            )
+            for prediction in result.predictions
+        ],
+        model=ClassifierModelRead(
+            backend=result.model_backend,
+            version=result.model_version,
+            mode=result.model_mode,
+        ),
+        inference_ms=result.inference_ms,
     )
 
 

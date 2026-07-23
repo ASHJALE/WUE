@@ -21,6 +21,12 @@ const furnitureClassNames = {
   lamp_shade: 'Lamp Shade',
 }
 
+function confidenceLabel(confidence) {
+  if (confidence >= 0.8) return 'High confidence'
+  if (confidence >= 0.5) return 'Moderate confidence'
+  return 'Low confidence'
+}
+
 const initialForm = {
   input_method: 'predefined',
   selected_furniture_type_id: '',
@@ -420,8 +426,7 @@ export default function EstimateCreate() {
     try {
       const classification = {
         ...classificationResult,
-        predicted_class: confirmedFurnitureType,
-        display_name: furnitureClassNames[confirmedFurnitureType],
+        confirmed_class: confirmedFurnitureType,
       }
       const result = await assemblePreliminaryQuotation({
         customer: quotationCustomer,
@@ -553,7 +558,7 @@ export default function EstimateCreate() {
               <section className="card border-0 bg-light mb-4" aria-labelledby="classification-heading">
                 <div className="card-body p-3 p-md-4">
                   <h2 className="h5" id="classification-heading">Furniture Classification</h2>
-                  <p className="text-secondary small">Analyze an uploaded image with the WUE development classifier.</p>
+                  <p className="text-secondary small">Analyze an uploaded image with the configured local WUE classifier.</p>
                   <button
                     className="btn btn-outline-success"
                     disabled={!imageUploadResult || classifyingImage}
@@ -564,17 +569,42 @@ export default function EstimateCreate() {
                     {classifyingImage ? 'Analyzing furniture…' : 'Analyze Furniture'}
                   </button>
                   {!imageUploadResult && <p className="text-secondary small mt-2 mb-0">Upload an image before analysis.</p>}
-                  {classificationError && <div className="alert alert-danger mt-3 mb-0" role="alert">{classificationError}</div>}
+                  {classificationError && (
+                    <div className="alert alert-danger mt-3 mb-0" role="alert">
+                      <strong>AI model unavailable or classification failed.</strong>{' '}
+                      {classificationError} You can continue using the predefined furniture selection in the estimate form.
+                    </div>
+                  )}
                   {classificationResult && (
                     <div className="classification-result mt-4" aria-live="polite">
-                      <div className="alert alert-warning" role="note">
-                        <strong>Development classifier:</strong> this deterministic placeholder is for workflow testing and is not production-ready AI.
-                      </div>
+                      {classificationResult.model.mode === 'development_fallback' && (
+                        <div className="alert alert-warning" role="note">
+                          <strong>Development fallback:</strong> this is not a trained-model prediction and must not be treated as production AI.
+                        </div>
+                      )}
+                      {classificationResult.low_confidence && (
+                        <div className="alert alert-warning" role="note">
+                          The model has low confidence. Review the alternatives and manually confirm the correct furniture type.
+                        </div>
+                      )}
                       <dl className="row mb-3">
-                        <dt className="col-sm-5">Predicted furniture type</dt><dd className="col-sm-7">{classificationResult.display_name}</dd>
-                        <dt className="col-sm-5">Confidence</dt><dd className="col-sm-7">{(classificationResult.confidence * 100).toFixed(1)}%</dd>
-                        <dt className="col-sm-5">Model</dt><dd className="col-sm-7">{classificationResult.model_name} v{classificationResult.model_version}</dd>
+                        <dt className="col-sm-5">AI prediction</dt><dd className="col-sm-7">{classificationResult.recognized_furniture_type.name}</dd>
+                        <dt className="col-sm-5">Confidence</dt><dd className="col-sm-7">{(classificationResult.confidence * 100).toFixed(1)}% — {confidenceLabel(classificationResult.confidence)}</dd>
+                        <dt className="col-sm-5">Model</dt><dd className="col-sm-7">{classificationResult.model.backend} / {classificationResult.model.version}</dd>
                       </dl>
+                      <section aria-labelledby="ranked-predictions-heading" className="mb-3">
+                        <h3 className="h6" id="ranked-predictions-heading">Ranked predictions</h3>
+                        <ol className="list-group list-group-numbered">
+                          {classificationResult.predictions.slice(0, 5).map((prediction) => (
+                            <li className="list-group-item d-flex justify-content-between align-items-center" key={prediction.key}>
+                              <span>{prediction.name}</span>
+                              <span aria-label={`${prediction.name} confidence ${(prediction.confidence * 100).toFixed(1)} percent`}>
+                                {(prediction.confidence * 100).toFixed(1)}%
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
                       <label className="form-label" htmlFor="confirmed-furniture-type">Confirm or correct furniture type</label>
                       <select
                         className="form-select"
@@ -589,6 +619,7 @@ export default function EstimateCreate() {
                       <button className="btn btn-success mt-3" onClick={confirmFurnitureType} type="button">
                         Confirm Furniture Type
                       </button>
+                      <p className="text-secondary small mt-2 mb-0">The AI prediction is advisory and requires user confirmation.</p>
                       {classificationConfirmed && (
                         <p className="alert alert-success mt-3 mb-0" role="status">
                           Confirmed furniture type: {furnitureClassNames[confirmedFurnitureType]}

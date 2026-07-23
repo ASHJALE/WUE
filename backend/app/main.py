@@ -3,6 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from .database import check_database_connection
 from .routers.auth import router as auth_router
+from .routers.classifier_health import router as classifier_health_router
 from .routers.bom import router as bom_router
 from .routers.costs import router as costs_router
 from .routers.estimates import router as estimates_router
@@ -24,6 +25,7 @@ app = FastAPI(
 )
 
 app.include_router(furniture_types_router)
+app.include_router(classifier_health_router)
 app.include_router(auth_router)
 app.include_router(bom_router)
 app.include_router(costs_router)
