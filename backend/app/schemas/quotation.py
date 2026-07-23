@@ -4,7 +4,13 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.schemas.bom import GeneratedBOMItem
+from app.schemas.classification import ClassificationRead, FurnitureClass
+from app.schemas.cost import CostCalculateResponse
+from app.schemas.material import MaterialRecommendation
+from app.schemas.quantity import EstimatedQuantityItem
 
 QuotationStatus = Literal["draft", "approved", "rejected", "completed"]
 
@@ -57,3 +63,71 @@ class QuotationListRead(BaseModel):
 
 class QuotationRead(QuotationListRead):
     items: list[QuotationItemRead]
+
+
+class PreliminaryCustomerInput(BaseModel):
+    name: str = Field(min_length=1, max_length=150)
+    project_name: str = Field(min_length=1, max_length=150)
+    location: str = Field(min_length=1, max_length=200)
+
+    @field_validator("name", "project_name", "location")
+    @classmethod
+    def require_nonblank_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Customer and project fields must not be blank.")
+        return cleaned
+
+
+class PreliminaryQuotationAssemble(BaseModel):
+    customer: PreliminaryCustomerInput
+    classification: ClassificationRead
+    recommendations: list[MaterialRecommendation] = Field(min_length=1)
+    bom: list[GeneratedBOMItem] = Field(min_length=1)
+    quantity_estimates: list[EstimatedQuantityItem] = Field(min_length=1)
+    cost_summary: CostCalculateResponse
+
+    @model_validator(mode="after")
+    def validate_sections_are_consistent(self):
+        if self.classification.predicted_class != self.cost_summary.furniture_type:
+            raise ValueError("Classification and cost summary furniture types must match.")
+        bom_components = {item.component for item in self.bom}
+        quantity_components = {item.component for item in self.quantity_estimates}
+        cost_components = {item.component for item in self.cost_summary.components}
+        if bom_components != quantity_components or quantity_components != cost_components:
+            raise ValueError("BOM, quantity, and cost components must match.")
+        return self
+
+
+class PreliminaryCustomerRead(BaseModel):
+    name: str
+    location: str
+
+
+class PreliminaryProjectRead(BaseModel):
+    name: str
+
+
+class PreliminaryFurnitureRead(BaseModel):
+    furniture_type: FurnitureClass
+    display_name: str
+    confidence: float = Field(ge=0, le=1)
+    model_name: str
+    model_version: str
+    is_placeholder: bool
+
+
+class PreliminaryQuotationRead(BaseModel):
+    quotation_id: str = Field(pattern=r"^TMP-\d{8}-\d{4}$")
+    status: Literal["preliminary"] = "preliminary"
+    currency: Literal["PHP"] = "PHP"
+    generated_at: datetime
+    customer: PreliminaryCustomerRead
+    project: PreliminaryProjectRead
+    furniture: PreliminaryFurnitureRead
+    recommendations: list[MaterialRecommendation]
+    bom: list[GeneratedBOMItem]
+    quantity_estimates: list[EstimatedQuantityItem]
+    cost_summary: CostCalculateResponse
+    assumptions: list[str]
+    disclaimer: Literal["This quotation preview is generated for estimation purposes only."]

@@ -13,6 +13,7 @@ from .routers.images import router as images_router
 from .routers.materials import router as materials_router
 from .routers.quotations import router as quotations_router
 from .routers.quotation_actions import router as quotation_actions_router
+from .routers.quotation import router as preliminary_quotation_router
 from .routers.quantity import router as quantity_router
 
 
@@ -33,6 +34,7 @@ app.include_router(furniture_materials_router)
 app.include_router(estimates_router)
 app.include_router(quotations_router)
 app.include_router(quotation_actions_router)
+app.include_router(preliminary_quotation_router)
 app.include_router(quantity_router)
 
 

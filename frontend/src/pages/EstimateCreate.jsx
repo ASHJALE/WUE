@@ -10,6 +10,7 @@ import { recommendMaterials } from '../services/materialRecommendationService.js
 import { generateStructuredBom } from '../services/bomGenerationService.js'
 import { estimateBomQuantities } from '../services/quantityEstimationService.js'
 import { calculatePreliminaryCost } from '../services/costCalculationService.js'
+import { assemblePreliminaryQuotation } from '../services/quotationAssemblyService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -80,11 +81,20 @@ export default function EstimateCreate() {
   const [calculatingCost, setCalculatingCost] = useState(false)
   const [costError, setCostError] = useState('')
   const [costResult, setCostResult] = useState(null)
+  const [quotationCustomer, setQuotationCustomer] = useState({
+    name: 'Sample Customer',
+    project_name: 'Furniture Project',
+    location: 'Angeles City',
+  })
+  const [assemblingQuotation, setAssemblingQuotation] = useState(false)
+  const [quotationError, setQuotationError] = useState('')
+  const [quotationPreview, setQuotationPreview] = useState(null)
   const recommendationRequestId = useRef(0)
   const classificationRequestId = useRef(0)
   const bomRequestId = useRef(0)
   const quantityRequestId = useRef(0)
   const costRequestId = useRef(0)
+  const quotationRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -113,6 +123,14 @@ export default function EstimateCreate() {
     setCostError('')
     setCostResult(null)
     costRequestId.current += 1
+    clearQuotationPreview()
+  }
+
+  function clearQuotationPreview() {
+    setAssemblingQuotation(false)
+    setQuotationError('')
+    setQuotationPreview(null)
+    quotationRequestId.current += 1
   }
 
   function handleDimensionChange(event) {
@@ -123,6 +141,11 @@ export default function EstimateCreate() {
   function handleCostInputChange(event) {
     setCostInputs((current) => ({ ...current, [event.target.name]: event.target.value }))
     clearCostResult()
+  }
+
+  function handleQuotationCustomerChange(event) {
+    setQuotationCustomer((current) => ({ ...current, [event.target.name]: event.target.value }))
+    clearQuotationPreview()
   }
 
   function handleImageChange(file) {
@@ -341,6 +364,7 @@ export default function EstimateCreate() {
     costRequestId.current = requestId
     setCalculatingCost(true)
     setCostError('')
+    clearQuotationPreview()
     try {
       const result = await calculatePreliminaryCost(
         quantityEstimates.furniture_type,
@@ -355,6 +379,40 @@ export default function EstimateCreate() {
       }
     } finally {
       if (costRequestId.current === requestId) setCalculatingCost(false)
+    }
+  }
+
+  async function handleQuotationAssembly() {
+    if (!costResult || assemblingQuotation) return
+    if (Object.values(quotationCustomer).some((value) => !value.trim())) {
+      setQuotationError('Customer name, project name, and location are required.')
+      return
+    }
+    const requestId = quotationRequestId.current + 1
+    quotationRequestId.current = requestId
+    setAssemblingQuotation(true)
+    setQuotationError('')
+    try {
+      const classification = {
+        ...classificationResult,
+        predicted_class: confirmedFurnitureType,
+        display_name: furnitureClassNames[confirmedFurnitureType],
+      }
+      const result = await assemblePreliminaryQuotation({
+        customer: quotationCustomer,
+        classification,
+        recommendations: materialRecommendations.materials,
+        bom: generatedBom.components,
+        quantity_estimates: quantityEstimates.components,
+        cost_summary: costResult,
+      })
+      if (quotationRequestId.current === requestId) setQuotationPreview(result)
+    } catch (requestError) {
+      if (quotationRequestId.current === requestId) {
+        setQuotationError(getApiErrorMessage(requestError, 'The preliminary quotation could not be assembled.'))
+      }
+    } finally {
+      if (quotationRequestId.current === requestId) setAssemblingQuotation(false)
     }
   }
 
@@ -733,6 +791,123 @@ export default function EstimateCreate() {
                   )}
                 </div>
               </section>
+              <section className="card border-0 bg-light mb-4 no-print" aria-labelledby="quotation-assembly-heading">
+                <div className="card-body p-3 p-md-4">
+                  <h2 className="h5" id="quotation-assembly-heading">Preliminary Quotation Preview</h2>
+                  <p className="text-secondary small">Add customer details and assemble all Phase 7 results.</p>
+                  <fieldset disabled={!costResult || assemblingQuotation}>
+                    <legend className="visually-hidden">Quotation customer and project details</legend>
+                    <div className="row g-3">
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="quotation-customer-name">Customer Name</label>
+                        <input className="form-control" id="quotation-customer-name" maxLength="150" name="name" onChange={handleQuotationCustomerChange} required value={quotationCustomer.name} />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="quotation-project-name">Project Name</label>
+                        <input className="form-control" id="quotation-project-name" maxLength="150" name="project_name" onChange={handleQuotationCustomerChange} required value={quotationCustomer.project_name} />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label" htmlFor="quotation-location">Location</label>
+                        <input className="form-control" id="quotation-location" maxLength="200" name="location" onChange={handleQuotationCustomerChange} required value={quotationCustomer.location} />
+                      </div>
+                    </div>
+                  </fieldset>
+                  <button className="btn btn-success mt-3" disabled={!costResult || assemblingQuotation} onClick={handleQuotationAssembly} type="button">
+                    {assemblingQuotation && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                    {assemblingQuotation ? 'Generating quotation…' : 'Generate Preliminary Quotation'}
+                  </button>
+                  {!costResult && <p className="text-secondary small mt-2 mb-0">Complete a successful cost calculation first.</p>}
+                  {quotationError && <div className="alert alert-danger mt-3 mb-0" role="alert">{quotationError}</div>}
+                </div>
+              </section>
+              {quotationPreview && (
+                <article className="quotation-preview card border-0 shadow-sm mb-4" aria-labelledby="quotation-preview-title" aria-live="polite">
+                  <div className="card-body p-4 p-lg-5">
+                    <header className="border-bottom pb-3 mb-4">
+                      <div className="d-flex flex-column flex-sm-row justify-content-between gap-3">
+                        <div>
+                          <p className="text-success fw-semibold mb-1">WUE Quotation Preview</p>
+                          <h2 className="h3" id="quotation-preview-title">{quotationPreview.quotation_id}</h2>
+                          <p className="text-secondary mb-0">Generated {new Date(quotationPreview.generated_at).toLocaleString()}</p>
+                        </div>
+                        <div className="text-sm-end">
+                          <span className="badge text-bg-warning fs-6">PRELIMINARY</span>
+                          <p className="small mt-2 mb-0">Currency: {quotationPreview.currency}</p>
+                        </div>
+                      </div>
+                    </header>
+
+                    <section className="mb-4" aria-labelledby="preview-customer-heading">
+                      <h3 className="h5" id="preview-customer-heading">Customer and Project</h3>
+                      <dl className="row mb-0">
+                        <dt className="col-sm-4">Customer Name</dt><dd className="col-sm-8">{quotationPreview.customer.name}</dd>
+                        <dt className="col-sm-4">Project Name</dt><dd className="col-sm-8">{quotationPreview.project.name}</dd>
+                        <dt className="col-sm-4">Location</dt><dd className="col-sm-8">{quotationPreview.customer.location}</dd>
+                      </dl>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-furniture-heading">
+                      <h3 className="h5" id="preview-furniture-heading">Furniture</h3>
+                      <p className="mb-1"><strong>Furniture Type:</strong> {quotationPreview.furniture.display_name}</p>
+                      <p className="mb-0"><strong>Classification Confidence:</strong> {(quotationPreview.furniture.confidence * 100).toFixed(1)}%</p>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-materials-heading">
+                      <h3 className="h5" id="preview-materials-heading">Recommended Materials</h3>
+                      <div className="row g-3">
+                        {['Primary', 'Alternative'].map((priority) => (
+                          <div className="col-md-6" key={priority}>
+                            <h4 className="h6">{priority}</h4>
+                            <ul className="mb-0">
+                              {quotationPreview.recommendations.filter((item) => item.priority === priority).map((item) => (
+                                <li key={`${priority}-${item.name}`}>{item.name} — {item.category}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-bom-heading">
+                      <h3 className="h5" id="preview-bom-heading">Bill of Materials</h3>
+                      <div className="table-responsive"><table className="table table-sm">
+                        <thead><tr><th scope="col">Component</th><th scope="col">Material</th><th scope="col">Category</th></tr></thead>
+                        <tbody>{quotationPreview.bom.map((item) => (
+                          <tr key={item.component}><th scope="row">{item.component}</th><td>{item.recommended_material}</td><td>{item.category}</td></tr>
+                        ))}</tbody>
+                      </table></div>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-quantities-heading">
+                      <h3 className="h5" id="preview-quantities-heading">Quantity Estimates</h3>
+                      <div className="table-responsive"><table className="table table-sm">
+                        <thead><tr><th scope="col">Component</th><th scope="col">Quantity</th><th scope="col">Unit</th></tr></thead>
+                        <tbody>{quotationPreview.quantity_estimates.map((item) => (
+                          <tr key={item.component}><th scope="row">{item.component}</th><td>{item.estimated_quantity}</td><td>{item.unit}</td></tr>
+                        ))}</tbody>
+                      </table></div>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-cost-heading">
+                      <h3 className="h5" id="preview-cost-heading">Cost Summary</h3>
+                      <dl className="row mb-0">
+                        <dt className="col-sm-7">Material Cost</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(quotationPreview.cost_summary.total_material_cost))}</dd>
+                        <dt className="col-sm-7">Labor Cost</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(quotationPreview.cost_summary.labor.labor_cost))}</dd>
+                        <dt className="col-sm-7">Profit</dt><dd className="col-sm-5 text-sm-end">{phpCurrency.format(Number(quotationPreview.cost_summary.profit_amount))}</dd>
+                        <dt className="col-sm-7 fs-5">Final Estimated Cost</dt><dd className="col-sm-5 text-sm-end fs-5 fw-bold">{phpCurrency.format(Number(quotationPreview.cost_summary.final_estimated_cost))}</dd>
+                      </dl>
+                    </section>
+
+                    <section className="mb-4" aria-labelledby="preview-assumptions-heading">
+                      <h3 className="h5" id="preview-assumptions-heading">Assumptions</h3>
+                      <ul>{quotationPreview.assumptions.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </section>
+                    <div className="alert alert-warning fw-semibold" role="note">{quotationPreview.disclaimer}</div>
+                    <p className="mb-1"><strong>This quotation is not yet saved.</strong></p>
+                    <p className="text-secondary mb-0">PDF export will be available in a future phase.</p>
+                  </div>
+                </article>
+              )}
               <div className="mb-3">
                 <label className="form-label" htmlFor="estimate-user">User</label>
                 <input className="form-control" id="estimate-user" readOnly value={`${user.username} (#${user.id})`} />

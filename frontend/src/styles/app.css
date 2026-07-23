@@ -157,3 +157,29 @@ dt {
     animation-iteration-count: 1 !important;
   }
 }
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .quotation-preview,
+  .quotation-preview * {
+    visibility: visible;
+  }
+
+  .quotation-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    box-shadow: none !important;
+  }
+
+  .quotation-preview .table-responsive {
+    overflow: visible;
+  }
+}
