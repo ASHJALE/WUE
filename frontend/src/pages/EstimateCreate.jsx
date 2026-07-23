@@ -8,6 +8,7 @@ import { createEstimate, getFurnitureTypes } from '../services/estimateService.j
 import { classifyFurnitureImage, uploadFurnitureImage } from '../services/imageService.js'
 import { recommendMaterials } from '../services/materialRecommendationService.js'
 import { generateStructuredBom } from '../services/bomGenerationService.js'
+import { estimateBomQuantities } from '../services/quantityEstimationService.js'
 
 const furnitureClassNames = {
   chair: 'Chair',
@@ -23,6 +24,14 @@ const initialForm = {
   recognized_furniture_type_id: '',
   image_path: '',
   recognition_confidence: '',
+}
+
+const dimensionDefaults = {
+  chair: { width: '450', depth: '500', height: '900' },
+  bed: { width: '1600', depth: '2000', height: '1000' },
+  sofa: { width: '2100', depth: '900', height: '850' },
+  dining_table: { width: '1800', depth: '900', height: '750' },
+  lamp_shade: { width: '350', depth: '350', height: '600' },
 }
 
 export default function EstimateCreate() {
@@ -48,9 +57,14 @@ export default function EstimateCreate() {
   const [generatingBom, setGeneratingBom] = useState(false)
   const [bomError, setBomError] = useState('')
   const [generatedBom, setGeneratedBom] = useState(null)
+  const [dimensions, setDimensions] = useState(dimensionDefaults.chair)
+  const [estimatingQuantities, setEstimatingQuantities] = useState(false)
+  const [quantityError, setQuantityError] = useState('')
+  const [quantityEstimates, setQuantityEstimates] = useState(null)
   const recommendationRequestId = useRef(0)
   const classificationRequestId = useRef(0)
   const bomRequestId = useRef(0)
+  const quantityRequestId = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -64,6 +78,18 @@ export default function EstimateCreate() {
   function updateField(event) {
     const { name, value } = event.target
     setForm((current) => ({ ...current, [name]: value }))
+  }
+
+  function clearQuantityEstimate() {
+    setEstimatingQuantities(false)
+    setQuantityError('')
+    setQuantityEstimates(null)
+    quantityRequestId.current += 1
+  }
+
+  function handleDimensionChange(event) {
+    setDimensions((current) => ({ ...current, [event.target.name]: event.target.value }))
+    clearQuantityEstimate()
   }
 
   function handleImageChange(file) {
@@ -84,6 +110,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
   }
 
   async function handleImageUpload() {
@@ -105,6 +132,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
     try {
       setImageUploadResult(await uploadFurnitureImage(selectedImage))
     } catch (requestError) {
@@ -131,6 +159,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
     try {
       const result = await classifyFurnitureImage(imageUploadResult.upload_id)
       if (classificationRequestId.current === requestId) {
@@ -157,6 +186,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
   }
 
   function confirmFurnitureType() {
@@ -169,6 +199,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
   }
 
   async function handleMaterialRecommendation() {
@@ -181,6 +212,7 @@ export default function EstimateCreate() {
     setBomError('')
     setGeneratedBom(null)
     bomRequestId.current += 1
+    clearQuantityEstimate()
     try {
       const result = await recommendMaterials(confirmedFurnitureType)
       if (recommendationRequestId.current === requestId) setMaterialRecommendations(result)
@@ -199,18 +231,52 @@ export default function EstimateCreate() {
     bomRequestId.current = requestId
     setGeneratingBom(true)
     setBomError('')
+    clearQuantityEstimate()
     try {
       const result = await generateStructuredBom(
         materialRecommendations.furniture_type,
         materialRecommendations.materials,
       )
-      if (bomRequestId.current === requestId) setGeneratedBom(result)
+      if (bomRequestId.current === requestId) {
+        setGeneratedBom(result)
+        setDimensions(dimensionDefaults[result.furniture_type])
+      }
     } catch (requestError) {
       if (bomRequestId.current === requestId) {
         setBomError(getApiErrorMessage(requestError, 'The structured BOM could not be generated.'))
       }
     } finally {
       if (bomRequestId.current === requestId) setGeneratingBom(false)
+    }
+  }
+
+  async function handleQuantityEstimation() {
+    if (!generatedBom || estimatingQuantities) return
+    const numericDimensions = Object.fromEntries(
+      Object.entries(dimensions).map(([key, value]) => [key, Number(value)]),
+    )
+    if (Object.values(numericDimensions).some((value) => !Number.isFinite(value) || value <= 0)) {
+      setQuantityError('Width, depth, and height must all be positive numbers.')
+      setQuantityEstimates(null)
+      return
+    }
+    const requestId = quantityRequestId.current + 1
+    quantityRequestId.current = requestId
+    setEstimatingQuantities(true)
+    setQuantityError('')
+    try {
+      const result = await estimateBomQuantities(
+        generatedBom.furniture_type,
+        numericDimensions,
+        generatedBom.components,
+      )
+      if (quantityRequestId.current === requestId) setQuantityEstimates(result)
+    } catch (requestError) {
+      if (quantityRequestId.current === requestId) {
+        setQuantityError(getApiErrorMessage(requestError, 'Material quantities could not be estimated.'))
+      }
+    } finally {
+      if (quantityRequestId.current === requestId) setEstimatingQuantities(false)
     }
   }
 
@@ -425,6 +491,82 @@ export default function EstimateCreate() {
                       </div>
                       <div className="alert alert-info mt-3 mb-0" role="note">
                         Quantities will be calculated during the next estimation phase.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+              <section className="card border-0 bg-light mb-4" aria-labelledby="quantity-estimate-heading">
+                <div className="card-body p-3 p-md-4">
+                  <h2 className="h5" id="quantity-estimate-heading">Preliminary Quantity Estimate</h2>
+                  <p className="text-secondary small">Enter overall furniture dimensions in millimeters.</p>
+                  <fieldset disabled={!generatedBom || estimatingQuantities}>
+                    <legend className="visually-hidden">Furniture dimensions</legend>
+                    <div className="row g-3">
+                      {['width', 'depth', 'height'].map((dimension) => (
+                        <div className="col-sm-4" key={dimension}>
+                          <label className="form-label text-capitalize" htmlFor={`dimension-${dimension}`}>{dimension} (mm)</label>
+                          <input
+                            className="form-control"
+                            id={`dimension-${dimension}`}
+                            min="1"
+                            name={dimension}
+                            onChange={handleDimensionChange}
+                            required
+                            step="1"
+                            type="number"
+                            value={dimensions[dimension]}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <button
+                    className="btn btn-outline-success mt-3"
+                    disabled={!generatedBom || estimatingQuantities}
+                    onClick={handleQuantityEstimation}
+                    type="button"
+                  >
+                    {estimatingQuantities && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                    {estimatingQuantities ? 'Estimating quantities…' : 'Estimate Quantities'}
+                  </button>
+                  {!generatedBom && <p className="text-secondary small mt-2 mb-0">Generate a structured BOM before estimating quantities.</p>}
+                  {quantityError && <div className="alert alert-danger mt-3 mb-0" role="alert">{quantityError}</div>}
+                  {quantityEstimates && (
+                    <div className="mt-4" aria-live="polite">
+                      <div className="d-flex flex-column flex-md-row justify-content-between gap-2 mb-3">
+                        <p className="fw-semibold mb-0">{quantityEstimates.components.length} estimated components</p>
+                        <p className="text-secondary small mb-0">
+                          Dimensions: {dimensions.width} × {dimensions.depth} × {dimensions.height} mm (W × D × H)
+                        </p>
+                      </div>
+                      <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0">
+                          <caption className="visually-hidden">Preliminary component quantity estimates</caption>
+                          <thead><tr>
+                            <th scope="col">Component</th>
+                            <th scope="col">Material</th>
+                            <th scope="col">Estimated Quantity</th>
+                            <th scope="col">Unit</th>
+                            <th scope="col">Calculation Basis</th>
+                            <th scope="col">Confidence</th>
+                          </tr></thead>
+                          <tbody>
+                            {quantityEstimates.components.map((item) => (
+                              <tr key={item.component}>
+                                <th scope="row">{item.component}</th>
+                                <td>{item.material}</td>
+                                <td>{item.estimated_quantity}</td>
+                                <td>{item.unit}</td>
+                                <td>{item.calculation_basis}</td>
+                                <td>{item.confidence}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="alert alert-warning mt-3 mb-0" role="note">
+                        These are preliminary engineering estimates and will be refined during pricing.
                       </div>
                     </div>
                   )}
